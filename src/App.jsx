@@ -129,7 +129,6 @@ export default function App() {
         });
       }
     } catch (e) {
-      console.warn("Using default status fallback due to fetch error:", e);
       setLiveStatus((prev) => ({ ...prev, loading: false }));
     }
   };
@@ -170,7 +169,7 @@ export default function App() {
       {/* Background Animated Grid */}
       <div className="fixed inset-0 pointer-events-none z-0 opacity-30">
         <div className="absolute -top-[20%] -left-[10%] w-[600px] h-[600px] rounded-full bg-neutral-800/30 blur-[140px] animate-pulse duration-[10000ms]" />
-        <div className="absolute top-[40%] -right-[10%] w-[500px] h-[500px] rounded-full bg-neutral-900/50 blur-[160px] animate-pulse duration-[8000ms]" />
+        <div className="absolute top-[40%] -right-[10%] w-[500px] h-[500px] rounded-full bg-neutral-900/50 blur-[160px] animate-pulse duration-[16000ms]" />
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#17171715_1px,transparent_1px),linear-gradient(to_bottom,#17171715_1px,transparent_1px)] bg-[size:4rem_4rem]" />
       </div>
 
@@ -443,7 +442,7 @@ function FeaturesPage() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CRASH-PROOF LIVE TELEMETRY DASHBOARD
+// SECURE & CLEAN LIVE TELEMETRY DASHBOARD
 // ─────────────────────────────────────────────────────────────────────────────
 function StatusPage({ liveStatus, fetchRealStatus }) {
   const [timeRange, setTimeRange] = useState('Live 1H');
@@ -515,7 +514,7 @@ function StatusPage({ liveStatus, fetchRealStatus }) {
             <h1 className="text-xl font-bold uppercase tracking-tight">Live Operations Monitor</h1>
             <p className="text-xs text-neutral-400 mt-0.5">
               {isRealData 
-                ? `Connected to Live TLC-Bot API at 176.100.37.77:30088 (${currentPing}ms)` 
+                ? `Connected to Live TLC-Bot API Gateway (${currentPing}ms)` 
                 : "Live telemetry bridge active • Polling status endpoint"}
             </p>
           </div>
@@ -601,18 +600,13 @@ function StatusPage({ liveStatus, fetchRealStatus }) {
         {/* SVG Chart Graphic */}
         <div className="relative w-full overflow-x-auto pt-4">
           <svg viewBox="0 0 800 200" className="w-full h-48 overflow-visible">
-            {/* Grid lines */}
             <line x1="0" y1="40" x2="800" y2="40" stroke="#262626" strokeDasharray="4 4" />
             <line x1="0" y1="90" x2="800" y2="90" stroke="#262626" strokeDasharray="4 4" />
             <line x1="0" y1="140" x2="800" y2="140" stroke="#262626" strokeDasharray="4 4" />
 
-            {/* Area */}
             {chartData.areaPath && <path d={chartData.areaPath} fill="rgba(255, 255, 255, 0.05)" />}
-
-            {/* Line */}
             {chartData.path && <path d={chartData.path} fill="none" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" />}
 
-            {/* Dots */}
             {chartData.dots.map((dot, idx) => (
               <g key={idx} className="group cursor-pointer">
                 <circle cx={dot.x} cy={dot.y} r="4" fill="#ffffff" stroke="#000000" strokeWidth="2" />
@@ -623,7 +617,6 @@ function StatusPage({ liveStatus, fetchRealStatus }) {
             ))}
           </svg>
 
-          {/* Time Labels */}
           <div className="flex justify-between text-[11px] text-neutral-500 pt-2 border-t border-neutral-900">
             {pingPoints.map((p, idx) => (
               <span key={idx}>{p?.time || 'Now'}</span>
@@ -634,8 +627,6 @@ function StatusPage({ liveStatus, fetchRealStatus }) {
 
       {/* Subsystem Grid & Operations Log */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        
-        {/* Subsystem Health Grid */}
         <div className="p-6 rounded-2xl bg-neutral-950 border border-neutral-800 text-white space-y-4">
           <h3 className="text-sm font-bold uppercase flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Subsystem Health Grid
@@ -669,7 +660,6 @@ function StatusPage({ liveStatus, fetchRealStatus }) {
           </div>
         </div>
 
-        {/* Operations Log Ledger */}
         <div className="md:col-span-2 p-6 rounded-2xl bg-neutral-950 border border-neutral-800 text-white space-y-4">
           <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
             <h3 className="text-sm font-bold uppercase flex items-center gap-2">
