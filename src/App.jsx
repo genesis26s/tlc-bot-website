@@ -17,13 +17,24 @@ import {
   Bot
 } from 'lucide-react';
 
-// --- LOGO COMPONENT (Reads assets/logo.png with fallback) ---
+// --- LOGO COMPONENT (Prioritizes logo.png with path fallbacks) ---
 function BotLogo({ className = "w-10 h-10" }) {
-  const [imgError, setImgError] = useState(false);
+  const [srcIndex, setSrcErrorIndex] = useState(0);
+  
+  // Try public assets path, then root public path
+  const logoSources = [
+    "/assets/logo.png",
+    "/logo.png"
+  ];
 
-  if (imgError) {
+  const handleImgError = () => {
+    setSrcErrorIndex((prev) => prev + 1);
+  };
+
+  // If all image paths failed, render the crisp fallback shield icon
+  if (srcIndex >= logoSources.length) {
     return (
-      <div className={`${className} rounded-xl bg-neutral-900 border border-neutral-700 flex items-center justify-center text-white`}>
+      <div className={`${className} rounded-xl bg-neutral-900 border border-neutral-700 flex items-center justify-center text-white shrink-0`}>
         <Shield className="w-1/2 h-1/2" />
       </div>
     );
@@ -31,10 +42,10 @@ function BotLogo({ className = "w-10 h-10" }) {
 
   return (
     <img 
-      src="/assets/logo.png" 
+      src={logoSources[srcIndex]} 
       alt="TLC-Bot Logo" 
-      onError={() => setImgError(true)}
-      className={`${className} object-contain rounded-xl border border-neutral-800 bg-neutral-950 p-1`}
+      onError={handleImgError}
+      className={`${className} object-contain rounded-xl border border-neutral-800 bg-neutral-950 p-1 shrink-0`}
     />
   );
 }
@@ -216,9 +227,9 @@ function HomePage({ setRoute, handleDiscordLogin, liveStatus }) {
   return (
     <div className="space-y-24 pb-20 pt-16 px-4 max-w-7xl mx-auto text-center">
       <div className="space-y-6 max-w-4xl mx-auto">
-        <div className="flex items-center justify-center gap-4">
+        <div className="flex items-center justify-center gap-4 flex-wrap">
           <BotLogo className="w-16 h-16 sm:w-24 sm:h-24" />
-          <h1 className="text-6xl sm:text-8xl font-black uppercase text-white font-mono">
+          <h1 className="text-6xl sm:text-8xl font-black uppercase text-white font-mono tracking-tight">
             TLC-BOT
           </h1>
         </div>
