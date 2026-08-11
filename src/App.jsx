@@ -6,7 +6,6 @@ import {
   AlertTriangle, 
   Ticket, 
   UserCheck, 
-  FileText, 
   Lock, 
   Zap, 
   RefreshCw, 
@@ -18,14 +17,14 @@ import {
   Bot
 } from 'lucide-react';
 
-// --- LOGO COMPONENT WITH FALLBACK ---
+// --- LOGO COMPONENT (Reads assets/logo.png with fallback) ---
 function BotLogo({ className = "w-10 h-10" }) {
   const [imgError, setImgError] = useState(false);
 
   if (imgError) {
     return (
       <div className={`${className} rounded-xl bg-neutral-900 border border-neutral-700 flex items-center justify-center text-white`}>
-        <Shield className="w-5 h-5" />
+        <Shield className="w-1/2 h-1/2" />
       </div>
     );
   }
@@ -107,7 +106,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-black text-neutral-100 font-sans selection:bg-neutral-100 selection:text-black flex flex-col justify-between relative overflow-hidden">
-      {/* Mesh Background */}
+      {/* Background Animated Mesh Gradient */}
       <div className="fixed inset-0 pointer-events-none z-0 opacity-40">
         <div className="absolute -top-[20%] -left-[10%] w-[600px] h-[600px] rounded-full bg-neutral-800/30 blur-[140px] animate-pulse duration-[10000ms]" />
         <div className="absolute top-[40%] -right-[10%] w-[500px] h-[500px] rounded-full bg-neutral-900/50 blur-[160px] animate-pulse duration-[8000ms]" />
@@ -192,9 +191,9 @@ export default function App() {
       {/* MAIN CONTENT */}
       <main className="relative z-10 flex-grow">
         {route === 'home' && <HomePage setRoute={setRoute} handleDiscordLogin={handleDiscordLogin} liveStatus={liveStatus} />}
-        {route === 'features' && <FeaturesPage setRoute={setRoute} />}
+        {route === 'features' && <FeaturesPage />}
         {route === 'status' && <StatusPage liveStatus={liveStatus} fetchRealStatus={fetchRealStatus} />}
-        {route === 'dashboard' && <DashboardPage user={user} setRoute={setRoute} liveStatus={liveStatus} />}
+        {route === 'dashboard' && <DashboardPage user={user} liveStatus={liveStatus} />}
         {route === '404' && <NotFoundPage setRoute={setRoute} />}
       </main>
 
@@ -217,10 +216,12 @@ function HomePage({ setRoute, handleDiscordLogin, liveStatus }) {
   return (
     <div className="space-y-24 pb-20 pt-16 px-4 max-w-7xl mx-auto text-center">
       <div className="space-y-6 max-w-4xl mx-auto">
-        <h1 className="text-6xl sm:text-8xl font-black uppercase text-white font-mono flex items-center justify-center gap-4">
-          <BotLogo className="w-16 h-16 sm:w-20 sm:h-20" />
-          TLC-BOT
-        </h1>
+        <div className="flex items-center justify-center gap-4">
+          <BotLogo className="w-16 h-16 sm:w-24 sm:h-24" />
+          <h1 className="text-6xl sm:text-8xl font-black uppercase text-white font-mono">
+            TLC-BOT
+          </h1>
+        </div>
         <h2 className="text-2xl text-neutral-300 font-light">Professional moderation & security for your Discord server.</h2>
         <p className="text-neutral-400 max-w-2xl mx-auto text-sm sm:text-base">Built specifically for TLC. Keeping your community secure, organized, and under control.</p>
       </div>
@@ -421,7 +422,7 @@ function StatusPage({ liveStatus, fetchRealStatus }) {
 }
 
 // DASHBOARD PAGE COMPONENT
-function DashboardPage({ user, setRoute, liveStatus }) {
+function DashboardPage({ user, liveStatus }) {
   if (!user) return null;
   return (
     <div className="py-16 px-4 max-w-6xl mx-auto space-y-8 text-left">
@@ -468,3 +469,4 @@ function NotFoundPage({ setRoute }) {
     </div>
   );
 }
+
