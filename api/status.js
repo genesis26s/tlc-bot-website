@@ -1,19 +1,20 @@
 // Vercel Serverless Function: GET /api/status
-// Securely relays live bot telemetry & historical ping metrics to frontend.
+// Securely proxies telemetry requests without exposing backend IP address or keys to the browser.
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const botApiUrl = process.env.TLC_BOT_API_URL || 'http://176.100.37.77:30088';
+  // Read backend server URL strictly from environment variables
+  const botApiUrl = process.env.TLC_BOT_API_URL;
   const botApiKey = process.env.TLC_BOT_API_KEY;
 
-  // Fallback structure mirroring live metrics if key is unconfigured
+  // Safe fallback telemetry if backend URL/key is not set in Vercel
   const mockFallback = {
     isRealData: false,
     status: 'operational',
-    bot: { online: true, latency_ms: 45, user: 'TLC-Bot#0000' },
+    bot: { online: true, latency_ms: 38, user: 'TLC-Bot#0000' },
     services: {
       discord: 'operational',
       api: 'operational',
@@ -42,14 +43,14 @@ export default async function handler(req, res) {
     ],
     operationsLog: [
       {
-        title: "SQLite Database WAL Migration Completed",
-        details: "Database connection pool expanded with PRAGMA busy_timeout=5000 structural validation.",
+        title: "SQLite Database WAL Engine Active",
+        details: "Database connection pool validated with PRAGMA busy_timeout=5000 structural validation.",
         time: "10m ago",
         status: "success"
       },
       {
         title: "Command Tree Synchronized",
-        details: "60 Commands re-indexed across modular cogs with multi-owner permission validations.",
+        details: "60 Commands re-indexed across modular cogs with permission validations.",
         time: "1h ago",
         status: "info"
       }
@@ -57,7 +58,7 @@ export default async function handler(req, res) {
     lastChecked: new Date().toISOString()
   };
 
-  if (!botApiKey) {
+  if (!botApiUrl || !botApiKey) {
     return res.status(200).json(mockFallback);
   }
 
@@ -71,20 +72,25 @@ export default async function handler(req, res) {
     });
 
     if (!response.ok) {
-      throw new Error(`Bot API responded with status ${response.status}`);
+      throw new Error(`Bot API returned HTTP status ${response.status}`);
     }
 
     const data = await response.json();
+
+    // Strip out internal IP/Port details if the bot returns them
+    delete data.internal_ip;
+    delete data.port;
+
     return res.status(200).json({
       isRealData: true,
       ...data
     });
   } catch (error) {
-    console.error('Vercel API relay error:', error);
+    console.error('Vercel API bridge connection error:', error.message);
     return res.status(200).json({
       ...mockFallback,
       status: 'degraded',
-      error: 'Could not connect to bot API at 176.100.37.77:30088'
+      error: 'Backend API connection currently unavailable'
     });
   }
 }
