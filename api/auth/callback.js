@@ -1,6 +1,5 @@
 // api/auth/callback.js
-// Handles Discord's OAuth2 callback: exchanges code for token, fetches user,
-// signs a JWT, sets it as an httpOnly cookie, and redirects to /dashboard.
+// Handles Discord's OAuth2 callback.
 
 import crypto from 'crypto';
 import { signToken } from '../_lib/jwt.js';
@@ -12,15 +11,20 @@ const COOKIE_SECRET = process.env.COOKIE_SECRET;
 
 function verifyState(signedState) {
   if (!signedState || !COOKIE_SECRET) return false;
-  const [nonce, sig] = signedState.split('.');
+  const parts = signedState.split('.');
+  if (parts.length !== 2) return false;
+  const [nonce, sig] = parts;
   if (!nonce || !sig) return false;
   const expectedSig = crypto
     .createHmac('sha256', COOKIE_SECRET)
     .update(nonce)
     .digest('hex');
-  // Timing-safe comparison
   if (sig.length !== expectedSig.length) return false;
-  return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expectedSig));
+  try {
+    return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expectedSig));
+  } catch {
+    return false;
+  }
 }
 
 export default async function handler(req, res) {
@@ -30,7 +34,6 @@ export default async function handler(req, res) {
 
   const { code, state, error } = req.query;
 
-  // User denied or OAuth error
   if (error) {
     return res.redirect(302, '/?auth_error=' + encodeURIComponent(error));
   }
@@ -39,7 +42,6 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Missing code or state parameter' });
   }
 
-  // Verify state matches what we stored in the cookie (CSRF protection)
   const cookieHeader = req.headers.cookie || '';
   const stateCookie = cookieHeader
     .split(';')
@@ -48,10 +50,9 @@ export default async function handler(req, res) {
     ?.split('=')[1];
 
   if (!stateCookie || !verifyState(stateCookie) || stateCookie !== state) {
-    return res.status(403).json({ error: 'Invalid state parameter (CSRF check failed)' });
+    return res.status(403).json({ error: 'Invalid state (CSRF check failed)' });
   }
 
-  // Exchange code for access token
   let tokenData;
   try {
     const tokenRes = await fetch('https://discord.com/api/oauth2/token', {
@@ -83,7 +84,6 @@ export default async function handler(req, res) {
     return res.redirect(302, '/?auth_error=no_access_token');
   }
 
-  // Fetch the user's Discord profile
   let user;
   try {
     const userRes = await fetch('https://discord.com/api/users/@me', {
@@ -100,28 +100,21 @@ export default async function handler(req, res) {
     return res.redirect(302, '/?auth_error=network_error');
   }
 
-  // Build the JWT payload (only store what the frontend needs)
   const payload = {
     id: user.id,
     username: user.username,
     global_name: user.global_name || user.username,
-    avatar: user.avatar,  // Discord's avatar hash; needs CDN URL construction
+    avatar: user.avatar,
     discriminator: user.discriminator
   };
 
-  const jwt = await signToken(payload, '7d');
+  const jwt = await signToken(payload, 7 * 24 * 60 * 60);
 
-  // Set the JWT as an httpOnly cookie
-  // Clear the oauth_state cookie now that we're done with it
+  const secureFlag = process.env.NODE_ENV === 'production' ? 'Secure;' : '';
   res.setHeader('Set-Cookie', [
-    `session=${jwt}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}; ${
-      process.env.NODE_ENV === 'production' ? 'Secure;' : ''
-    }`,
-    `oauth_state=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0; ${
-      process.env.NODE_ENV === 'production' ? 'Secure;' : ''
-    }`
+    `session=${jwt}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}; ${secureFlag}`,
+    `oauth_state=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0; ${secureFlag}`
   ]);
 
-  // Redirect to dashboard
-  return res.redirect(302, '/dashboard');
+  return res.redirect(302, '/');
 }
