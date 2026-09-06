@@ -1,11 +1,9 @@
 // api/auth/me.js
-// Returns the current user from the JWT session cookie, or 401 if not logged in.
+// Returns the current user from the session cookie.
 
 import { verifyToken } from '../_lib/jwt.js';
 
 function buildAvatarUrl(user) {
-  // Discord avatar hash → CDN URL. If user has no custom avatar, return null
-  // so the frontend can fall back to a default.
   if (!user.avatar) return null;
   const ext = user.avatar.startsWith('a_') ? 'gif' : 'png';
   return `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.${ext}?size=128`;
@@ -30,12 +28,10 @@ export default async function handler(req, res) {
   const payload = await verifyToken(sessionCookie);
 
   if (!payload) {
-    // Token invalid or expired. Clear the cookie so the client doesn't keep sending it.
+    const secureFlag = process.env.NODE_ENV === 'production' ? 'Secure;' : '';
     res.setHeader(
       'Set-Cookie',
-      `session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0; ${
-        process.env.NODE_ENV === 'production' ? 'Secure;' : ''
-      }`
+      `session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0; ${secureFlag}`
     );
     return res.status(401).json({ error: 'Session expired or invalid' });
   }
