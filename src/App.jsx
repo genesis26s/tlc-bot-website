@@ -20,6 +20,7 @@ import {
   Server,
   Database
 } from 'lucide-react';
+import { Analytics } from '@vercel/analytics/react';
 
 // --- LOGO COMPONENT ---
 function BotLogo({ className = "w-10 h-10" }) {
@@ -266,6 +267,7 @@ export default function App() {
           <p className="text-neutral-500">© 2026 TLC-Bot. All rights reserved.</p>
         </div>
       </footer>
+      <Analytics />
     </div>
   );
 }
@@ -735,4 +737,3 @@ function NotFoundPage({ setRoute }) {
     </div>
   );
 }
-
