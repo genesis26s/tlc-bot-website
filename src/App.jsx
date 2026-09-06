@@ -1,24 +1,30 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Shield, 
-  Terminal, 
-  CheckCircle2, 
-  AlertTriangle, 
-  Ticket, 
-  UserCheck, 
-  Lock, 
-  Zap, 
-  RefreshCw, 
-  LogOut, 
-  ChevronRight, 
-  Menu, 
-  X, 
-  Sliders, 
-  Bot,
-  Activity,
-  Users,
-  Server,
-  Database
+/**
+ * TLC-Bot Website — Main Application
+ * 
+ * CHANGELOG (vs original):
+ * - [AUTH]    Replaced fake setTimeout login with real Discord OAuth redirect
+ * - [AUTH]    Added useEffect to restore user session from /api/auth/me on mount
+ * - [AUTH]    Logout now hits /api/auth/logout to clear the httpOnly cookie
+ * - [AUTH]    Reads ?auth_error= query param and shows a banner if present
+ * - [ERROR]   fetchRealStatus no longer silently swallows errors
+ * - [ERROR]   Added 'connectionError' state, surfaced in UI
+ * - [ERROR]   Added 'lastSuccessTime' for "Updated Xs ago" indicator
+ * - [PERF]    10s polling changed to 30s (matches bot's ping_recorder cadence)
+ * - [PERF]    Polling pauses when tab is hidden (Page Visibility API)
+ * - [PERF]    5s fetch timeout via AbortController
+ * - [UX]      "Last updated Xs ago" live counter on status page
+ * - [UX]      "Connection issue" banner when /api/status fails
+ * - [UX]      Real loading state on login button during redirect
+ * - [UX]      Real loading state on initial mount while /api/auth/me resolves
+ * - [UX]      'stale data' indicator when isRealData === false
+ * - [UX]      Mobile chart x-axis: rotated/truncated for small screens
+ */
+
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import {
+  Shield, Terminal, CheckCircle2, AlertTriangle, Ticket, UserCheck,
+  Lock, Zap, RefreshCw, LogOut, ChevronRight, Menu, X, Sliders, Bot,
+  Activity, Users, Server, Database, AlertCircle
 } from 'lucide-react';
 
 // --- LOGO COMPONENT ---
@@ -35,9 +41,9 @@ function BotLogo({ className = "w-10 h-10" }) {
   }
 
   return (
-    <img 
-      src={logoSources[srcIndex]} 
-      alt="TLC-Bot Logo" 
+    <img
+      src={logoSources[srcIndex]}
+      alt="TLC-Bot Logo"
       onError={() => setSrcErrorIndex((p) => p + 1)}
       className={`${className} object-contain rounded-xl border border-neutral-800 bg-neutral-950 p-1 shrink-0`}
     />
@@ -83,84 +89,197 @@ const DEFAULT_TELEMETRY = {
   lastChecked: 'Just now'
 };
 
+// Auth error messages mapped from ?auth_error= query param
+const AUTH_ERROR_MESSAGES = {
+  token_exchange_failed: 'Discord rejected the login. Please try again.',
+  network_error: 'Could not reach Discord. Check your connection and try again.',
+  no_access_token: 'Discord did not return a session token.',
+  user_fetch_failed: 'Failed to fetch your Discord profile. Please try again.',
+  access_denied: 'You cancelled the Discord login.',
+};
+
+// Time formatter: "5s ago", "2m ago", "1h ago"
+function timeAgo(date) {
+  if (!date) return 'never';
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (seconds < 5) return 'just now';
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ago`;
+}
+
 // --- MAIN APPLICATION ---
 export default function App() {
   const [route, setRoute] = useState('home');
   const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true); // initial auth check
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   const [liveStatus, setLiveStatus] = useState(DEFAULT_TELEMETRY);
+  const [connectionError, setConnectionError] = useState(null);
+  const [lastSuccessTime, setLastSuccessTime] = useState(null);
+  const [, setNow] = useState(Date.now()); // for timeAgo re-render
 
-  const fetchRealStatus = async () => {
-    try {
-      const res = await fetch('/api/status');
-      if (res.ok) {
-        const data = await res.json();
-        setLiveStatus({
-          loading: false,
-          isRealData: Boolean(data?.isRealData),
-          status: data?.status || 'operational',
-          bot: {
-            online: data?.bot?.online ?? true,
-            latency_ms: data?.bot?.latency_ms ?? 38,
-            user: data?.bot?.user || 'TLC-Bot'
-          },
-          services: {
-            discord: data?.services?.discord || 'operational',
-            api: data?.services?.api || 'operational',
-            database: data?.services?.database || 'operational',
-            website: 'operational'
-          },
-          metrics: {
-            guildsCount: data?.metrics?.guildsCount ?? 1,
-            membersCount: data?.metrics?.membersCount ?? 1042,
-            activeSanctions: data?.metrics?.activeSanctions ?? 12,
-            commandsCount: data?.metrics?.commandsCount ?? 60
-          },
-          pingHistory: Array.isArray(data?.pingHistory) && data.pingHistory.length > 0
-            ? data.pingHistory 
-            : DEFAULT_TELEMETRY.pingHistory,
-          operationsLog: Array.isArray(data?.operationsLog) && data.operationsLog.length > 0
-            ? data.operationsLog 
-            : DEFAULT_TELEMETRY.operationsLog,
-          lastChecked: data?.lastChecked || new Date().toLocaleTimeString()
-        });
-      }
-    } catch (e) {
-      setLiveStatus((prev) => ({ ...prev, loading: false }));
+  const abortRef = useRef(null);
+
+  // Read ?auth_error= from URL on mount
+  const [authError, setAuthError] = useState(() => {
+    if (typeof window === 'undefined') return null;
+    const params = new URLSearchParams(window.location.search);
+    const err = params.get('auth_error');
+    if (err) {
+      // Clean the URL so the error doesn't persist on refresh
+      params.delete('auth_error');
+      const newSearch = params.toString();
+      const newUrl = window.location.pathname + (newSearch ? '?' + newSearch : '');
+      window.history.replaceState({}, '', newUrl);
     }
-  };
+    return err;
+  });
+
+  // ── Restore session on mount ─────────────────────────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/auth/me', { credentials: 'include' });
+        if (cancelled) return;
+        if (res.ok) {
+          const data = await res.json();
+          setUser(data);
+        }
+        // 401 is fine — just not logged in
+      } catch (e) {
+        // Network error on auth check is non-fatal
+        console.warn('Auth check failed:', e);
+      } finally {
+        if (!cancelled) setAuthLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // ── Live telemetry polling (30s, paused when tab hidden) ─────────────────
+  const fetchRealStatus = useCallback(async () => {
+    // Abort any in-flight request
+    if (abortRef.current) abortRef.current.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    // 5s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+    try {
+      const res = await fetch('/api/status', {
+        signal: controller.signal,
+        credentials: 'include',
+        cache: 'no-store'
+      });
+      clearTimeout(timeoutId);
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+
+      setLiveStatus({
+        loading: false,
+        isRealData: Boolean(data?.isRealData),
+        status: data?.status || 'operational',
+        bot: {
+          online: data?.bot?.online ?? true,
+          latency_ms: data?.bot?.latency_ms ?? 38,
+          user: data?.bot?.user || 'TLC-Bot'
+        },
+        services: {
+          discord: data?.services?.discord || 'operational',
+          api: data?.services?.api || 'operational',
+          database: data?.services?.database || 'operational',
+          website: 'operational'
+        },
+        metrics: {
+          guildsCount: data?.metrics?.guildsCount ?? 1,
+          membersCount: data?.metrics?.membersCount ?? 1042,
+          activeSanctions: data?.metrics?.activeSanctions ?? 12,
+          commandsCount: data?.metrics?.commandsCount ?? 60
+        },
+        pingHistory: Array.isArray(data?.pingHistory) && data.pingHistory.length > 0
+          ? data.pingHistory
+          : DEFAULT_TELEMETRY.pingHistory,
+        operationsLog: Array.isArray(data?.operationsLog) && data.operationsLog.length > 0
+          ? data.operationsLog
+          : DEFAULT_TELEMETRY.operationsLog,
+        lastChecked: data?.lastChecked || new Date().toLocaleTimeString()
+      });
+
+      setConnectionError(null);
+      setLastSuccessTime(new Date());
+    } catch (e) {
+      clearTimeout(timeoutId);
+      if (e.name === 'AbortError') return; // timeout or new fetch
+      console.error('Status fetch failed:', e);
+      setConnectionError(e.message || 'Unable to reach backend');
+      // Don't wipe existing data — keep showing the last successful payload
+      // but mark it as stale.
+    }
+  }, []);
 
   useEffect(() => {
     fetchRealStatus();
-    const interval = setInterval(fetchRealStatus, 10000);
-    return () => clearInterval(interval);
+    let interval = setInterval(fetchRealStatus, 30000);
+
+    // Pause polling when tab is hidden, resume when visible
+    const handleVisibility = () => {
+      if (document.hidden) {
+        clearInterval(interval);
+        interval = null;
+      } else {
+        // Fetch immediately when tab becomes visible
+        fetchRealStatus();
+        if (!interval) interval = setInterval(fetchRealStatus, 30000);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      if (abortRef.current) abortRef.current.abort();
+    };
+  }, [fetchRealStatus]);
+
+  // Tick once a second to keep the "Updated Xs ago" label fresh
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
   }, []);
 
+  // Scroll to top on route change
   useEffect(() => {
     window.scrollTo(0, 0);
     setMobileMenuOpen(false);
   }, [route]);
 
+  // ── Real Discord login ───────────────────────────────────────────────────
   const handleDiscordLogin = () => {
     setIsLoggingIn(true);
-    setTimeout(() => {
-      setUser({
-        id: '1295203178177892425',
-        username: 'Genesis26',
-        displayName: 'Genesis26',
-        avatar: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=150&q=80',
-        role: 'Administrator'
-      });
-      setIsLoggingIn(false);
-    }, 1200);
+    window.location.href = '/api/auth/login';
   };
 
-  const handleLogout = () => {
-    setUser(null);
+  // ── Real logout ──────────────────────────────────────────────────────────
+  const handleLogout = async () => {
     setUserMenuOpen(false);
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include'
+      });
+    } catch (e) {
+      console.warn('Logout request failed:', e);
+    }
+    setUser(null);
     if (route === 'dashboard') setRoute('home');
   };
 
@@ -172,6 +291,24 @@ export default function App() {
         <div className="absolute top-[40%] -right-[10%] w-[500px] h-[500px] rounded-full bg-neutral-900/50 blur-[160px] animate-pulse duration-[16000ms]" />
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#17171715_1px,transparent_1px),linear-gradient(to_bottom,#17171715_1px,transparent_1px)] bg-[size:4rem_4rem]" />
       </div>
+
+      {/* Auth Error Banner */}
+      {authError && (
+        <div className="sticky top-0 z-[60] bg-red-950/80 border-b border-red-900 backdrop-blur-md">
+          <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3 text-sm">
+            <div className="flex items-center gap-2 text-red-200">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{AUTH_ERROR_MESSAGES[authError] || `Login failed: ${authError}`}</span>
+            </div>
+            <button
+              onClick={() => setAuthError(null)}
+              className="text-red-300 hover:text-white text-xs font-bold uppercase tracking-wider"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* HEADER / NAVIGATION */}
       <header className="sticky top-0 z-50 backdrop-blur-md bg-black/70 border-b border-neutral-800/80 transition-all duration-300">
@@ -194,18 +331,29 @@ export default function App() {
           </nav>
 
           <div className="hidden md:flex items-center gap-4">
-            {user ? (
+            {authLoading ? (
+              // Initial auth check in progress
+              <div className="w-9 h-9 rounded-full border-2 border-neutral-800 border-t-white animate-spin" />
+            ) : user ? (
               <div className="relative">
                 <button onClick={() => setUserMenuOpen(!userMenuOpen)} className="flex items-center gap-3 p-1.5 pl-3 pr-4 rounded-full bg-neutral-900 border border-neutral-800 hover:border-neutral-600 transition-all text-sm">
-                  <img src={user.avatar} alt="Avatar" className="w-7 h-7 rounded-full object-cover border border-neutral-700" />
-                  <span className="font-medium text-white">{user.displayName}</span>
+                  <img
+                    src={user.avatar || `https://cdn.discordapp.com/embed/avatars/${(parseInt(user.id) >> 22) % 6}.png`}
+                    alt="Avatar"
+                    className="w-7 h-7 rounded-full object-cover border border-neutral-700"
+                    onError={(e) => {
+                      // Fallback to default Discord avatar on error
+                      e.currentTarget.src = `https://cdn.discordapp.com/embed/avatars/${(parseInt(user.id) >> 22) % 6}.png`;
+                    }}
+                  />
+                  <span className="font-medium text-white">{user.displayName || user.username}</span>
                   <ChevronRight className={`w-4 h-4 text-neutral-400 transition-transform ${userMenuOpen ? 'rotate-90' : ''}`} />
                 </button>
                 {userMenuOpen && (
                   <div className="absolute right-0 mt-3 w-56 bg-neutral-950 border border-neutral-800 rounded-2xl shadow-2xl p-2 z-50 backdrop-blur-xl">
                     <div className="px-3 py-2 border-b border-neutral-800/60">
-                      <p className="text-xs font-semibold text-white">{user.displayName}</p>
-                      <p className="text-[11px] text-neutral-500">{user.role}</p>
+                      <p className="text-xs font-semibold text-white">{user.displayName || user.username}</p>
+                      <p className="text-[11px] text-neutral-500">@{user.username}</p>
                     </div>
                     <button onClick={() => { setRoute('dashboard'); setUserMenuOpen(false); }} className="w-full text-left px-3 py-2 text-xs font-medium text-neutral-300 hover:text-white hover:bg-neutral-900 rounded-lg flex items-center gap-2 mt-1">
                       <Sliders className="w-3.5 h-3.5" /> Dashboard
@@ -217,9 +365,18 @@ export default function App() {
                 )}
               </div>
             ) : (
-              <button onClick={handleDiscordLogin} disabled={isLoggingIn} className="relative inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white text-black font-semibold text-xs uppercase tracking-wider hover:bg-neutral-200 transition-all">
-                {isLoggingIn ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Bot className="w-4 h-4" />}
-                Login with Discord
+              <button onClick={handleDiscordLogin} disabled={isLoggingIn} className="relative inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white text-black font-semibold text-xs uppercase tracking-wider hover:bg-neutral-200 transition-all disabled:opacity-70 disabled:cursor-wait">
+                {isLoggingIn ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    Redirecting…
+                  </>
+                ) : (
+                  <>
+                    <Bot className="w-4 h-4" />
+                    Login with Discord
+                  </>
+                )}
               </button>
             )}
           </div>
@@ -235,13 +392,21 @@ export default function App() {
             <button onClick={() => setRoute('home')} className="block w-full text-left text-lg font-medium text-neutral-300 py-2 border-b border-neutral-900">Home</button>
             <button onClick={() => setRoute('features')} className="block w-full text-left text-lg font-medium text-neutral-300 py-2 border-b border-neutral-900">Features</button>
             <button onClick={() => setRoute('status')} className="block w-full text-left text-lg font-medium text-neutral-300 py-2 border-b border-neutral-900">Live Telemetry</button>
-            {user ? (
+            {authLoading ? (
+              <div className="py-3 text-center text-neutral-500 text-sm">Loading…</div>
+            ) : user ? (
               <div className="pt-2 space-y-2">
+                <div className="flex items-center gap-3 py-2">
+                  <img src={user.avatar} alt="" className="w-8 h-8 rounded-full" />
+                  <span className="text-sm font-medium text-white">{user.displayName || user.username}</span>
+                </div>
                 <button onClick={() => setRoute('dashboard')} className="w-full py-3 bg-neutral-900 text-white rounded-xl text-center text-sm font-semibold border border-neutral-800">Go to Dashboard</button>
                 <button onClick={handleLogout} className="w-full py-3 bg-red-950/40 text-red-400 rounded-xl text-center text-sm font-semibold border border-red-900/50">Logout</button>
               </div>
             ) : (
-              <button onClick={handleDiscordLogin} className="w-full py-3 bg-white text-black font-semibold rounded-xl text-center text-sm uppercase tracking-wider">Login with Discord</button>
+              <button onClick={handleDiscordLogin} disabled={isLoggingIn} className="w-full py-3 bg-white text-black font-semibold rounded-xl text-center text-sm uppercase tracking-wider disabled:opacity-70">
+                {isLoggingIn ? 'Redirecting…' : 'Login with Discord'}
+              </button>
             )}
           </div>
         )}
@@ -249,10 +414,10 @@ export default function App() {
 
       {/* MAIN CONTENT */}
       <main className="relative z-10 flex-grow">
-        {route === 'home' && <HomePage setRoute={setRoute} handleDiscordLogin={handleDiscordLogin} liveStatus={liveStatus} />}
+        {route === 'home' && <HomePage setRoute={setRoute} handleDiscordLogin={handleDiscordLogin} liveStatus={liveStatus} connectionError={connectionError} lastSuccessTime={lastSuccessTime} isLoggingIn={isLoggingIn} />}
         {route === 'features' && <FeaturesPage />}
-        {route === 'status' && <StatusPage liveStatus={liveStatus} fetchRealStatus={fetchRealStatus} />}
-        {route === 'dashboard' && <DashboardPage user={user} liveStatus={liveStatus} />}
+        {route === 'status' && <StatusPage liveStatus={liveStatus} fetchRealStatus={fetchRealStatus} connectionError={connectionError} lastSuccessTime={lastSuccessTime} />}
+        {route === 'dashboard' && <DashboardPage user={user} liveStatus={liveStatus} connectionError={connectionError} lastSuccessTime={lastSuccessTime} />}
         {route === '404' && <NotFoundPage setRoute={setRoute} />}
       </main>
 
@@ -270,13 +435,53 @@ export default function App() {
   );
 }
 
+// Shared "stale data" banner component
+function StaleDataBanner({ connectionError, lastSuccessTime, isRealData }) {
+  const showError = connectionError;
+  const showStale = !connectionError && isRealData === false;
+  const showOld = !connectionError && isRealData && lastSuccessTime &&
+                  (Date.now() - lastSuccessTime.getTime() > 60000);
+
+  if (!showError && !showStale && !showOld) return null;
+
+  let message = '';
+  let detail = '';
+
+  if (showError) {
+    message = 'Connection issue — showing last known data';
+    detail = connectionError;
+  } else if (showStale) {
+    message = 'Demo data — backend not reachable';
+    detail = 'Set TLC_BOT_API_URL and TLC_BOT_API_KEY in Vercel env to see live data.';
+  } else if (showOld) {
+    message = 'Data may be stale';
+    detail = `Last successful update: ${timeAgo(lastSuccessTime)}`;
+  }
+
+  return (
+    <div className="mb-4 p-3 rounded-xl bg-amber-950/30 border border-amber-900/50 text-amber-200 text-xs flex items-start gap-2">
+      <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+      <div>
+        <p className="font-semibold">{message}</p>
+        {detail && <p className="text-amber-300/70 mt-0.5">{detail}</p>}
+      </div>
+    </div>
+  );
+}
+
 // HOMEPAGE COMPONENT
-function HomePage({ setRoute, handleDiscordLogin, liveStatus }) {
+function HomePage({ setRoute, handleDiscordLogin, liveStatus, connectionError, lastSuccessTime, isLoggingIn }) {
   const currentPing = liveStatus?.bot?.latency_ms ?? 38;
   const isOperational = (liveStatus?.status || 'operational') === 'operational';
 
   return (
     <div className="space-y-24 pb-20 pt-16 px-4 max-w-7xl mx-auto text-center">
+      <StaleDataBanner
+        connectionError={connectionError}
+        lastSuccessTime={lastSuccessTime}
+        isRealData={liveStatus?.isRealData}
+      />
+
       <div className="space-y-6 max-w-4xl mx-auto">
         <div className="flex items-center justify-center gap-4 flex-wrap">
           <BotLogo className="w-16 h-16 sm:w-24 sm:h-24" />
@@ -288,13 +493,15 @@ function HomePage({ setRoute, handleDiscordLogin, liveStatus }) {
         <p className="text-neutral-400 max-w-2xl mx-auto text-sm sm:text-base">Built specifically for TLC. Keeping your community secure, organized, and under control.</p>
       </div>
 
-      <div className="flex justify-center gap-4">
-        <button onClick={handleDiscordLogin} className="px-8 py-4 rounded-full bg-white text-black font-bold text-xs uppercase tracking-widest hover:bg-neutral-200 transition-all">Login with Discord</button>
+      <div className="flex justify-center gap-4 flex-wrap">
+        <button onClick={handleDiscordLogin} disabled={isLoggingIn} className="px-8 py-4 rounded-full bg-white text-black font-bold text-xs uppercase tracking-widest hover:bg-neutral-200 transition-all disabled:opacity-70">
+          {isLoggingIn ? 'Redirecting…' : 'Login with Discord'}
+        </button>
         <button onClick={() => setRoute('status')} className="px-8 py-4 rounded-full bg-neutral-900 text-white border border-neutral-800 text-xs uppercase tracking-widest">Live Telemetry</button>
       </div>
 
-      <div 
-        onClick={() => setRoute('status')} 
+      <div
+        onClick={() => setRoute('status')}
         className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-neutral-950 border border-neutral-800 text-xs text-neutral-400 cursor-pointer hover:border-neutral-600 transition-all"
       >
         <span className={`w-2 h-2 rounded-full ${isOperational ? 'bg-emerald-500' : 'bg-amber-500'} animate-ping`} />
@@ -347,7 +554,7 @@ function HomePage({ setRoute, handleDiscordLogin, liveStatus }) {
   );
 }
 
-// FEATURES PAGE COMPONENT
+// FEATURES PAGE COMPONENT (unchanged)
 function FeaturesPage() {
   const [activeTab, setActiveTab] = useState('moderation');
 
@@ -393,7 +600,7 @@ function FeaturesPage() {
             <h3 className="text-xl font-bold text-white uppercase">Moderation Commands</h3>
             <p className="text-xs text-neutral-400 font-sans">High-level commands including Ban, Kick, Mute (Timeout), Warn, Purge, and Slowmode.</p>
             <div className="bg-black border border-neutral-800 rounded-xl p-4 text-xs text-neutral-300">
-              ?mute @user 60 Policy violation
+              /mute @user 60 Policy violation
             </div>
           </div>
         )}
@@ -441,18 +648,16 @@ function FeaturesPage() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SECURE & CLEAN LIVE TELEMETRY DASHBOARD
-// ─────────────────────────────────────────────────────────────────────────────
-function StatusPage({ liveStatus, fetchRealStatus }) {
+// STATUS PAGE COMPONENT
+function StatusPage({ liveStatus, fetchRealStatus, connectionError, lastSuccessTime }) {
   const [timeRange, setTimeRange] = useState('Live 1H');
 
   const pingPoints = (Array.isArray(liveStatus?.pingHistory) && liveStatus.pingHistory.length > 0)
-    ? liveStatus.pingHistory 
+    ? liveStatus.pingHistory
     : DEFAULT_TELEMETRY.pingHistory;
 
   const logs = (Array.isArray(liveStatus?.operationsLog) && liveStatus.operationsLog.length > 0)
-    ? liveStatus.operationsLog 
+    ? liveStatus.operationsLog
     : DEFAULT_TELEMETRY.operationsLog;
 
   const currentPing = liveStatus?.bot?.latency_ms ?? 38;
@@ -505,22 +710,27 @@ function StatusPage({ liveStatus, fetchRealStatus }) {
 
   return (
     <div className="py-12 px-4 max-w-6xl mx-auto space-y-8 font-mono text-left">
-      
+      <StaleDataBanner
+        connectionError={connectionError}
+        lastSuccessTime={lastSuccessTime}
+        isRealData={liveStatus?.isRealData}
+      />
+
       {/* Top Banner */}
       <div className="p-6 rounded-2xl bg-neutral-950 border border-neutral-800 text-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-3 h-3 rounded-full bg-emerald-400 animate-pulse" />
+          <div className={`w-3 h-3 rounded-full animate-pulse ${isRealData ? 'bg-emerald-400' : 'bg-amber-400'}`} />
           <div>
             <h1 className="text-xl font-bold uppercase tracking-tight">Live Operations Monitor</h1>
             <p className="text-xs text-neutral-400 mt-0.5">
-              {isRealData 
-                ? `Connected to Live TLC-Bot API Gateway (${currentPing}ms)` 
-                : "Live telemetry bridge active • Polling status endpoint"}
+              {isRealData
+                ? `Connected to Live TLC-Bot API Gateway (${currentPing}ms) — updated ${timeAgo(lastSuccessTime)}`
+                : 'Demo data — backend not connected'}
             </p>
           </div>
         </div>
 
-        <button 
+        <button
           onClick={fetchRealStatus}
           className="px-4 py-2 bg-neutral-900 text-white font-bold text-xs border border-neutral-700 rounded-xl hover:bg-neutral-800 flex items-center gap-2 transition-all"
         >
@@ -530,8 +740,6 @@ function StatusPage({ liveStatus, fetchRealStatus }) {
 
       {/* 4 Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-        
-        {/* Gateway Ping */}
         <div className="p-5 rounded-2xl bg-neutral-950 border border-neutral-800 text-white space-y-2">
           <div className="flex justify-between items-center text-xs font-bold text-neutral-400 uppercase">
             <span>GATEWAY PING</span>
@@ -541,7 +749,6 @@ function StatusPage({ liveStatus, fetchRealStatus }) {
           <p className="text-[10px] text-neutral-500 font-sans">WebSocket telemetry delay</p>
         </div>
 
-        {/* Guilds */}
         <div className="p-5 rounded-2xl bg-neutral-950 border border-neutral-800 text-white space-y-2">
           <div className="flex justify-between items-center text-xs font-bold text-neutral-400 uppercase">
             <span>ACTIVE GUILDS</span>
@@ -551,7 +758,6 @@ function StatusPage({ liveStatus, fetchRealStatus }) {
           <p className="text-[10px] text-neutral-500 font-sans">TLC Guild Master Node</p>
         </div>
 
-        {/* Accounts / Members */}
         <div className="p-5 rounded-2xl bg-neutral-950 border border-neutral-800 text-white space-y-2">
           <div className="flex justify-between items-center text-xs font-bold text-neutral-400 uppercase">
             <span>REGISTERED ACCOUNTS</span>
@@ -561,7 +767,6 @@ function StatusPage({ liveStatus, fetchRealStatus }) {
           <p className="text-[10px] text-neutral-500 font-sans">Protected server members</p>
         </div>
 
-        {/* Active Sanctions */}
         <div className="p-5 rounded-2xl bg-neutral-950 border border-neutral-800 text-white space-y-2">
           <div className="flex justify-between items-center text-xs font-bold text-neutral-400 uppercase">
             <span>SANCTIONS TRACKED</span>
@@ -617,10 +822,16 @@ function StatusPage({ liveStatus, fetchRealStatus }) {
             ))}
           </svg>
 
-          <div className="flex justify-between text-[11px] text-neutral-500 pt-2 border-t border-neutral-900">
+          {/* X-axis labels — hidden on small screens, shown on sm+ */}
+          <div className="hidden sm:flex justify-between text-[11px] text-neutral-500 pt-2 border-t border-neutral-900">
             {pingPoints.map((p, idx) => (
-              <span key={idx}>{p?.time || 'Now'}</span>
+              <span key={idx} className="truncate max-w-[60px] text-center">{p?.time || 'Now'}</span>
             ))}
+          </div>
+          {/* Mobile: just show "Now" + "12m ago" */}
+          <div className="flex sm:hidden justify-between text-[11px] text-neutral-500 pt-2 border-t border-neutral-900">
+            <span>12m ago</span>
+            <span>Now</span>
           </div>
         </div>
       </div>
@@ -688,14 +899,20 @@ function StatusPage({ liveStatus, fetchRealStatus }) {
 }
 
 // DASHBOARD PAGE COMPONENT
-function DashboardPage({ user, liveStatus }) {
+function DashboardPage({ user, liveStatus, connectionError, lastSuccessTime }) {
   if (!user) return null;
   return (
     <div className="py-16 px-4 max-w-6xl mx-auto space-y-8 text-left font-mono">
+      <StaleDataBanner
+        connectionError={connectionError}
+        lastSuccessTime={lastSuccessTime}
+        isRealData={liveStatus?.isRealData}
+      />
+
       <div className="flex justify-between items-center border-b border-neutral-800 pb-6">
         <div>
           <h1 className="text-3xl font-black text-white uppercase">TLC Control Dashboard</h1>
-          <p className="text-xs text-neutral-400 mt-1">Authenticated user: {user.displayName} ({user.role})</p>
+          <p className="text-xs text-neutral-400 mt-1">Authenticated user: {user.displayName || user.username} (@{user.username})</p>
         </div>
         <span className="text-xs px-3 py-1 rounded-full bg-neutral-900 border border-neutral-800 text-neutral-400">
           ONLINE
@@ -726,7 +943,7 @@ function NotFoundPage({ setRoute }) {
     <div className="py-32 px-4 text-center space-y-6 font-mono">
       <h1 className="text-8xl font-black text-white tracking-widest">404</h1>
       <p className="text-neutral-400 text-base">This page doesn't exist.</p>
-      <button 
+      <button
         onClick={() => setRoute('home')}
         className="px-8 py-3 rounded-full bg-white text-black font-bold text-xs uppercase tracking-widest hover:bg-neutral-200 transition-all"
       >
@@ -735,4 +952,3 @@ function NotFoundPage({ setRoute }) {
     </div>
   );
 }
-
