@@ -1,139 +1,123 @@
 /**
- * TLC-Bot Website — Main Application
- *
- * CHANGELOG (Phase 2 - Real Data):
- * - [NEW] Fetches /api/recent-events, /api/recent-sanctions,
- *         /api/config, /api/server-info
- * - [NEW] Home page Security Console: real protection level,
- *         real active threats, real recent events
- * - [NEW] Features page Sanctions tab: shows real recent cases
- * - [NEW] Features page Moderation tab: shows real command list
- * - [NEW] Status page header: shows real guild name + bot version
- * - [NEW] Dashboard page: real uptime, version, feature flags
+ * TLC-Bot Website — Premium Edition
+ * Apple-inspired design, mesh gradient background, liquid glass cards
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import {
-  Shield, Terminal, CheckCircle2, AlertTriangle, Ticket, UserCheck,
-  Lock, Zap, RefreshCw, LogOut, ChevronRight, Menu, X, Sliders, Bot,
-  Activity, Users, Server, Database, AlertCircle, Cpu, Clock, Code
-} from 'lucide-react';
+import './index.css';
 
-// --- LOGO COMPONENT ---
-function BotLogo({ className = "w-10 h-10" }) {
-  const [srcIndex, setSrcErrorIndex] = useState(0);
-  const logoSources = ["/assets/logo.png", "/logo.png"];
+const ICONS = {
+  shield: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>,
+  terminal: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>,
+  check: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>,
+  alert: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
+  ticket: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"/></svg>,
+  userCheck: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>,
+  lock: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>,
+  zap: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
+  refresh: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>,
+  logOut: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
+  chevronRight: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="9 18 15 12 9 6"/></svg>,
+  menu: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>,
+  x: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+  sliders: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>,
+  bot: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>,
+  activity: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>,
+  users: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+  server: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>,
+  database: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>,
+  alertCircle: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>,
+  clock: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+  cpu: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>,
+  code: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>,
+};
 
-  if (srcIndex >= logoSources.length) {
-    return (
-      <div className={`${className} rounded-xl bg-neutral-900 border border-neutral-700 flex items-center justify-center text-white shrink-0`}>
-        <Shield className="w-1/2 h-1/2" />
-      </div>
-    );
-  }
-
-  return (
-    <img
-      src={logoSources[srcIndex]}
-      alt="TLC-Bot Logo"
-      onError={() => setSrcErrorIndex((p) => p + 1)}
-      className={`${className} object-contain rounded-xl border border-neutral-800 bg-neutral-950 p-1 shrink-0`}
-    />
-  );
-}
-
+// --- Default Data ---
 const DEFAULT_TELEMETRY = {
-  loading: false,
   isRealData: false,
   status: 'operational',
   bot: { online: true, latency_ms: 38, user: 'TLC-Bot' },
-  services: { discord: 'operational', api: 'operational', database: 'operational', website: 'operational' },
+  services: { discord: 'operational', database: 'operational' },
   metrics: { guildsCount: 1, membersCount: 1042, activeSanctions: 0, commandsCount: 0 },
-  pingHistory: [
-    { time: "11m ago", ping: 42 },
-    { time: "10m ago", ping: 45 },
-    { time: "9m ago", ping: 39 },
-    { time: "8m ago", ping: 48 },
-    { time: "7m ago", ping: 52 },
-    { time: "6m ago", ping: 44 },
-    { time: "5m ago", ping: 41 },
-    { time: "4m ago", ping: 46 },
-    { time: "3m ago", ping: 50 },
-    { time: "2m ago", ping: 43 },
-    { time: "1m ago", ping: 47 },
-    { time: "Now", ping: 45 }
-  ],
-  operationsLog: [
-    {
-      title: "Awaiting live data",
-      details: "Connecting to TLC-Bot backend…",
-      time: "—",
-      status: "info"
-    }
-  ],
-  lastChecked: 'Just now'
+  pingHistory: Array.from({ length: 12 }, (_, i) => ({ time: `${11 - i}m ago`, ping: 40 + Math.floor(Math.random() * 20) })),
 };
 
-const DEFAULT_FEATURE_FLAGS = {
-  anti_spam: true, anti_raid: true, verification: true,
-  welcome: true, goodbye: true, tickets: true,
-  monitoring: true, logging: true,
-  max_warn_before_ban: 3, default_mute_duration_minutes: 60,
-  anti_raid_threshold: 10, isRealData: false
-};
-
-const DEFAULT_SERVER_INFO = {
-  bot_user: 'TLC-Bot', bot_id: null,
-  discord_py_version: '—', python_version: '—', platform: '—',
-  uptime_seconds: 0, guilds: 0, total_members: 0, shard_count: 1,
-  latency_ms: null, is_ready: false, primary_guild: null, isRealData: false
-};
-
+const DEFAULT_FEATURE_FLAGS = { anti_spam: true, anti_raid: true, verification: true, welcome: true, goodbye: true, tickets: true, monitoring: true, logging: true, isRealData: false };
+const DEFAULT_SERVER_INFO = { bot_user: 'TLC-Bot', discord_py_version: '—', python_version: '—', platform: '—', uptime_seconds: 0, primary_guild: null, isRealData: false };
 const DEFAULT_RECENT_EVENTS = { events: [], isRealData: false };
 const DEFAULT_RECENT_SANCTIONS = { sanctions: [], active_count: 0, isRealData: false };
 
-const AUTH_ERROR_MESSAGES = {
-  token_exchange_failed: 'Discord rejected the login. Please try again.',
-  network_error: 'Could not reach Discord. Check your connection and try again.',
-  no_access_token: 'Discord did not return a session token.',
-  user_fetch_failed: 'Failed to fetch your Discord profile. Please try again.',
-  access_denied: 'You cancelled the Discord login.',
-};
+// --- Hooks ---
+function useNumberTicker(target, duration = 800) {
+  const [value, setValue] = useState(0);
+  const startRef = useRef(0);
+  const startValueRef = useRef(0);
+
+  useEffect(() => {
+    startValueRef.current = value;
+    startRef.current = performance.now();
+    const tick = (now) => {
+      const elapsed = now - startRef.current;
+      const t = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - t, 3); // ease-out cubic
+      setValue(Math.round(startValueRef.current + (target - startValueRef.current) * eased));
+      if (t < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }, [target]);
+
+  return value;
+}
 
 function timeAgo(date) {
   if (!date) return 'never';
-  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (seconds < 5) return 'just now';
-  if (seconds < 60) return `${seconds}s ago`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+  const s = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (s < 5) return 'just now';
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
 }
 
-function formatUptime(seconds) {
-  if (!seconds || seconds < 0) return '—';
-  const d = Math.floor(seconds / 86400);
-  const h = Math.floor((seconds % 86400) / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
+function formatUptime(s) {
+  if (!s || s < 0) return '—';
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
   if (d > 0) return `${d}d ${h}h`;
   if (h > 0) return `${h}h ${m}m`;
   return `${m}m`;
 }
 
-function formatEventTime(iso) {
-  if (!iso) return '—';
-  try {
-    const d = new Date(iso.includes('T') ? iso : iso.replace(' ', 'T') + 'Z');
-    if (isNaN(d.getTime())) return iso;
-    return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
-  } catch {
-    return iso;
+// --- Logo ---
+function BotLogo({ className = "w-10 h-10" }) {
+  const [srcIndex, setSrcErrorIndex] = useState(0);
+  const sources = ["/assets/logo.png", "/logo.png"];
+  if (srcIndex >= sources.length) {
+    return <div className={`${className} rounded-2xl glass flex items-center justify-center text-white/80`}>{ICONS.shield}</div>;
   }
+  return <img src={sources[srcIndex]} alt="TLC-Bot" onError={() => setSrcErrorIndex(p => p + 1)} className={`${className} object-contain rounded-2xl glass p-1.5`} />;
 }
 
+// --- Status Dot ---
+function StatusDot({ online, error }) {
+  const className = error ? 'error' : online ? 'online' : 'offline';
+  return <span className={`status-dot ${className}`} />;
+}
+
+// --- Mesh Gradient Background ---
+function MeshBackground() {
+  return (
+    <>
+      <div className="mesh-gradient" />
+      <div className="mesh-gradient-orb" />
+    </>
+  );
+}
+
+// --- App Root ---
 export default function App() {
   const [route, setRoute] = useState('home');
   const [user, setUser] = useState(null);
@@ -141,12 +125,17 @@ export default function App() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [authError, setAuthError] = useState(() => {
+    if (typeof window === 'undefined') return null;
+    const p = new URLSearchParams(window.location.search);
+    const err = p.get('auth_error');
+    if (err) { p.delete('auth_error'); window.history.replaceState({}, '', window.location.pathname + (p.toString() ? '?' + p : '')); }
+    return err;
+  });
 
   const [liveStatus, setLiveStatus] = useState(DEFAULT_TELEMETRY);
   const [connectionError, setConnectionError] = useState(null);
   const [lastSuccessTime, setLastSuccessTime] = useState(null);
-  const [, setNow] = useState(Date.now());
-
   const [recentEvents, setRecentEvents] = useState(DEFAULT_RECENT_EVENTS);
   const [recentSanctions, setRecentSanctions] = useState(DEFAULT_RECENT_SANCTIONS);
   const [featureFlags, setFeatureFlags] = useState(DEFAULT_FEATURE_FLAGS);
@@ -154,665 +143,401 @@ export default function App() {
 
   const abortRef = useRef(null);
 
-  const [authError, setAuthError] = useState(() => {
-    if (typeof window === 'undefined') return null;
-    const params = new URLSearchParams(window.location.search);
-    const err = params.get('auth_error');
-    if (err) {
-      params.delete('auth_error');
-      const newSearch = params.toString();
-      const newUrl = window.location.pathname + (newSearch ? '?' + newSearch : '');
-      window.history.replaceState({}, '', newUrl);
-    }
-    return err;
-  });
-
+  // Restore session
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const res = await fetch('/api/auth/me', { credentials: 'include' });
-        if (cancelled) return;
-        if (res.ok) {
-          const data = await res.json();
-          setUser(data);
-        }
-      } catch (e) {
-        console.warn('Auth check failed:', e);
-      } finally {
-        if (!cancelled) setAuthLoading(false);
-      }
+        if (!cancelled && res.ok) setUser(await res.json());
+      } catch (e) {}
+      finally { if (!cancelled) setAuthLoading(false); }
     })();
     return () => { cancelled = true; };
   }, []);
 
-  const fetchWithTimeout = useCallback(async (url, timeoutMs = 5000) => {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  // Fetch with timeout
+  const fetchWithTimeout = useCallback(async (url, ms = 5000) => {
+    const c = new AbortController();
+    const t = setTimeout(() => c.abort(), ms);
     try {
-      const res = await fetch(url, {
-        signal: controller.signal,
-        credentials: 'include',
-        cache: 'no-store'
-      });
-      clearTimeout(timeoutId);
+      const res = await fetch(url, { signal: c.signal, credentials: 'include', cache: 'no-store' });
+      clearTimeout(t);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return await res.json();
-    } finally {
-      clearTimeout(timeoutId);
-    }
+    } finally { clearTimeout(t); }
   }, []);
 
-  const fetchAllData = useCallback(async () => {
+  // Fetch all
+  const fetchAll = useCallback(async () => {
     if (abortRef.current) abortRef.current.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
+    abortRef.current = new AbortController();
 
     try {
       const data = await fetchWithTimeout('/api/status');
       setLiveStatus({
-        loading: false,
         isRealData: Boolean(data?.isRealData),
         status: data?.status || 'operational',
-        bot: {
-          online: data?.bot?.online ?? true,
-          latency_ms: data?.bot?.latency_ms ?? 38,
-          user: data?.bot?.user || 'TLC-Bot'
-        },
-        services: {
-          discord: data?.services?.discord || 'operational',
-          api: data?.services?.api || 'operational',
-          database: data?.services?.database || 'operational',
-          website: 'operational'
-        },
+        bot: { online: data?.bot?.online ?? true, latency_ms: data?.bot?.latency_ms ?? 38, user: data?.bot?.user || 'TLC-Bot' },
+        services: { discord: data?.services?.discord || 'operational', database: data?.services?.database || 'operational' },
         metrics: {
-          guildsCount: data?.metrics?.guildsCount ?? 1,
-          membersCount: data?.metrics?.membersCount ?? 1042,
+          guildsCount: data?.metrics?.guildsCount ?? 0,
+          membersCount: data?.metrics?.membersCount ?? 0,
           activeSanctions: data?.metrics?.activeSanctions ?? 0,
           commandsCount: data?.metrics?.commandsCount ?? 0
         },
-        pingHistory: Array.isArray(data?.pingHistory) && data.pingHistory.length > 0
-          ? data.pingHistory
-          : DEFAULT_TELEMETRY.pingHistory,
-        operationsLog: Array.isArray(data?.operationsLog) && data.operationsLog.length > 0
-          ? data.operationsLog
-          : DEFAULT_TELEMETRY.operationsLog,
-        lastChecked: data?.lastChecked || new Date().toLocaleTimeString()
+        pingHistory: data?.pingHistory || DEFAULT_TELEMETRY.pingHistory,
       });
       setConnectionError(null);
       setLastSuccessTime(new Date());
     } catch (e) {
-      if (e.name === 'AbortError') return;
-      console.error('Status fetch failed:', e);
-      setConnectionError(e.message || 'Unable to reach backend');
+      if (e.name !== 'AbortError') setConnectionError(e.message);
     }
 
-    try {
-      const data = await fetchWithTimeout('/api/recent-events?limit=5');
-      setRecentEvents({ events: data.events || [], isRealData: Boolean(data.isRealData) });
-    } catch (e) {
-      if (e.name !== 'AbortError') console.warn('recent-events failed:', e);
-    }
-
-    try {
-      const data = await fetchWithTimeout('/api/recent-sanctions?limit=3');
-      setRecentSanctions({
-        sanctions: data.sanctions || [],
-        active_count: data.active_count || 0,
-        isRealData: Boolean(data.isRealData)
-      });
-    } catch (e) {
-      if (e.name !== 'AbortError') console.warn('recent-sanctions failed:', e);
-    }
-
-    try {
-      const data = await fetchWithTimeout('/api/config');
-      setFeatureFlags({ ...DEFAULT_FEATURE_FLAGS, ...data, isRealData: Boolean(data.isRealData) });
-    } catch (e) {
-      if (e.name !== 'AbortError') console.warn('config failed:', e);
-    }
-
-    try {
-      const data = await fetchWithTimeout('/api/server-info');
-      setServerInfo({ ...DEFAULT_SERVER_INFO, ...data, isRealData: Boolean(data.isRealData) });
-    } catch (e) {
-      if (e.name !== 'AbortError') console.warn('server-info failed:', e);
-    }
+    try { const d = await fetchWithTimeout('/api/recent-events?limit=5'); setRecentEvents({ events: d.events || [], isRealData: Boolean(d.isRealData) }); } catch (e) {}
+    try { const d = await fetchWithTimeout('/api/recent-sanctions?limit=3'); setRecentSanctions({ sanctions: d.sanctions || [], active_count: d.active_count || 0, isRealData: Boolean(d.isRealData) }); } catch (e) {}
+    try { const d = await fetchWithTimeout('/api/config'); setFeatureFlags({ ...DEFAULT_FEATURE_FLAGS, ...d }); } catch (e) {}
+    try { const d = await fetchWithTimeout('/api/server-info'); setServerInfo({ ...DEFAULT_SERVER_INFO, ...d }); } catch (e) {}
   }, [fetchWithTimeout]);
 
   useEffect(() => {
-    fetchAllData();
-    let interval = setInterval(fetchAllData, 30000);
-
-    const handleVisibility = () => {
-      if (document.hidden) {
-        clearInterval(interval);
-        interval = null;
-      } else {
-        fetchAllData();
-        if (!interval) interval = setInterval(fetchAllData, 30000);
-      }
+    fetchAll();
+    let interval = setInterval(fetchAll, 30000);
+    const vis = () => {
+      if (document.hidden) { clearInterval(interval); interval = null; }
+      else { fetchAll(); if (!interval) interval = setInterval(fetchAll, 30000); }
     };
-    document.addEventListener('visibilitychange', handleVisibility);
+    document.addEventListener('visibilitychange', vis);
+    return () => { clearInterval(interval); document.removeEventListener('visibilitychange', vis); };
+  }, [fetchAll]);
 
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibility);
-      if (abortRef.current) abortRef.current.abort();
-    };
-  }, [fetchAllData]);
+  useEffect(() => { window.scrollTo(0, 0); setMobileMenuOpen(false); }, [route]);
 
+  // Keyboard: R to refresh
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
+    const h = (e) => { if (e.key === 'r' && !e.ctrlKey && !e.metaKey && document.activeElement?.tagName !== 'INPUT') fetchAll(); };
+    document.addEventListener('keydown', h);
+    return () => document.removeEventListener('keydown', h);
+  }, [fetchAll]);
 
-  useEffect(() => {
-    window.scrollTo(0, 0);
-    setMobileMenuOpen(false);
-  }, [route]);
-
-  const handleDiscordLogin = () => {
-    setIsLoggingIn(true);
-    window.location.href = '/api/auth/login';
-  };
-
+  const handleLogin = () => { setIsLoggingIn(true); window.location.href = '/api/auth/login'; };
   const handleLogout = async () => {
     setUserMenuOpen(false);
-    try {
-      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
-    } catch (e) {
-      console.warn('Logout failed:', e);
-    }
+    try { await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }); } catch (e) {}
     setUser(null);
     if (route === 'dashboard') setRoute('home');
   };
 
   return (
-    <div className="min-h-screen bg-black text-neutral-100 font-sans selection:bg-neutral-100 selection:text-black flex flex-col justify-between relative overflow-hidden">
-      <div className="fixed inset-0 pointer-events-none z-0 opacity-30">
-        <div className="absolute -top-[20%] -left-[10%] w-[600px] h-[600px] rounded-full bg-neutral-800/30 blur-[140px] animate-pulse duration-[10000ms]" />
-        <div className="absolute top-[40%] -right-[10%] w-[500px] h-[500px] rounded-full bg-neutral-900/50 blur-[160px] animate-pulse duration-[16000ms]" />
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#17171715_1px,transparent_1px),linear-gradient(to_bottom,#17171715_1px,transparent_1px)] bg-[size:4rem_4rem]" />
-      </div>
+    <div className="min-h-screen text-white relative">
+      <MeshBackground />
 
       {authError && (
-        <div className="sticky top-0 z-[60] bg-red-950/80 border-b border-red-900 backdrop-blur-md">
-          <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3 text-sm">
-            <div className="flex items-center gap-2 text-red-200">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{AUTH_ERROR_MESSAGES[authError] || `Login failed: ${authError}`}</span>
-            </div>
-            <button
-              onClick={() => setAuthError(null)}
-              className="text-red-300 hover:text-white text-xs font-bold uppercase tracking-wider"
-            >
-              Dismiss
-            </button>
-          </div>
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] animate-in glass-strong rounded-2xl px-4 py-2.5 flex items-center gap-3 text-sm border border-red-500/20">
+          <span className="text-red-400">{ICONS.alertCircle}</span>
+          <span className="text-white/90">{authError === 'access_denied' ? 'Login cancelled' : 'Login failed'}</span>
+          <button onClick={() => setAuthError(null)} className="text-white/40 hover:text-white ml-2">{ICONS.x}</button>
         </div>
       )}
 
-      <header className="sticky top-0 z-50 backdrop-blur-md bg-black/70 border-b border-neutral-800/80 transition-all duration-300">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          <div onClick={() => setRoute('home')} className="flex items-center gap-3 cursor-pointer group">
-            <BotLogo className="w-10 h-10 transition-transform duration-300 group-hover:scale-105" />
-            <div className="flex flex-col">
-              <span className="font-bold tracking-wider text-lg uppercase font-mono text-white flex items-center gap-1.5">
-                TLC-BOT
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-400 border border-neutral-700">v2.5</span>
-              </span>
-              <span className="text-[10px] tracking-widest text-neutral-500 uppercase">Security System</span>
-            </div>
+      {/* Header */}
+      <header className="sticky top-4 z-50 mx-4 mt-4">
+        <div className="max-w-6xl mx-auto glass-strong rounded-2xl px-4 sm:px-6 h-14 flex items-center justify-between">
+          <div onClick={() => setRoute('home')} className="flex items-center gap-2.5 cursor-pointer group">
+            <BotLogo className="w-7 h-7" />
+            <span className="font-semibold text-sm tracking-tight">TLC-Bot</span>
           </div>
 
-          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-neutral-400">
-            <button onClick={() => setRoute('home')} className={`transition-colors hover:text-white ${route === 'home' ? 'text-white font-semibold' : ''}`}>Home</button>
-            <button onClick={() => setRoute('features')} className={`transition-colors hover:text-white ${route === 'features' ? 'text-white font-semibold' : ''}`}>Features</button>
-            <button onClick={() => setRoute('status')} className={`transition-colors hover:text-white ${route === 'status' ? 'text-white font-semibold' : ''}`}>Live Telemetry</button>
+          <nav className="hidden md:flex items-center gap-1 text-sm">
+            {['home', 'features', 'status'].map((r) => (
+              <button
+                key={r}
+                onClick={() => setRoute(r)}
+                className={`px-3 py-1.5 rounded-xl transition-smooth capitalize ${route === r ? 'bg-white/10 text-white' : 'text-white/50 hover:text-white'}`}
+              >
+                {r === 'home' ? 'Home' : r === 'features' ? 'Features' : 'Status'}
+              </button>
+            ))}
           </nav>
 
-          <div className="hidden md:flex items-center gap-4">
+          <div className="flex items-center gap-2">
             {authLoading ? (
-              <div className="w-9 h-9 rounded-full border-2 border-neutral-800 border-t-white animate-spin" />
+              <div className="w-7 h-7 rounded-full border-2 border-white/20 border-t-white animate-spin" />
             ) : user ? (
               <div className="relative">
-                <button onClick={() => setUserMenuOpen(!userMenuOpen)} className="flex items-center gap-3 p-1.5 pl-3 pr-4 rounded-full bg-neutral-900 border border-neutral-800 hover:border-neutral-600 transition-all text-sm">
-                  <img
-                    src={user.avatar || `https://cdn.discordapp.com/embed/avatars/${(parseInt(user.id) >> 22) % 6}.png`}
-                    alt="Avatar"
-                    className="w-7 h-7 rounded-full object-cover border border-neutral-700"
-                    onError={(e) => {
-                      e.currentTarget.src = `https://cdn.discordapp.com/embed/avatars/${(parseInt(user.id) >> 22) % 6}.png`;
-                    }}
-                  />
-                  <span className="font-medium text-white">{user.displayName || user.username}</span>
-                  <ChevronRight className={`w-4 h-4 text-neutral-400 transition-transform ${userMenuOpen ? 'rotate-90' : ''}`} />
+                <button onClick={() => setUserMenuOpen(!userMenuOpen)} className="flex items-center gap-2 p-1 rounded-xl glass btn-press">
+                  <img src={user.avatar || `https://cdn.discordapp.com/embed/avatars/${(parseInt(user.id) >> 22) % 6}.png`} alt="" className="w-6 h-6 rounded-lg" />
+                  <span className="text-sm font-medium pr-2 hidden sm:inline">{user.displayName || user.username}</span>
                 </button>
                 {userMenuOpen && (
-                  <div className="absolute right-0 mt-3 w-56 bg-neutral-950 border border-neutral-800 rounded-2xl shadow-2xl p-2 z-50 backdrop-blur-xl">
-                    <div className="px-3 py-2 border-b border-neutral-800/60">
-                      <p className="text-xs font-semibold text-white">{user.displayName || user.username}</p>
-                      <p className="text-[11px] text-neutral-500">@{user.username}</p>
+                  <div className="absolute right-0 mt-2 w-56 glass-strong rounded-2xl p-2 animate-in">
+                    <div className="px-3 py-2 border-b border-white/10">
+                      <p className="text-sm font-medium">{user.displayName || user.username}</p>
+                      <p className="text-xs text-white/50">@{user.username}</p>
                     </div>
-                    <button onClick={() => { setRoute('dashboard'); setUserMenuOpen(false); }} className="w-full text-left px-3 py-2 text-xs font-medium text-neutral-300 hover:text-white hover:bg-neutral-900 rounded-lg flex items-center gap-2 mt-1">
-                      <Sliders className="w-3.5 h-3.5" /> Dashboard
+                    <button onClick={() => { setRoute('dashboard'); setUserMenuOpen(false); }} className="w-full text-left px-3 py-2 text-sm rounded-xl hover:bg-white/5 flex items-center gap-2 mt-1">
+                      {ICONS.sliders} Dashboard
                     </button>
-                    <button onClick={handleLogout} className="w-full text-left px-3 py-2 text-xs font-medium text-red-400 hover:bg-red-950/30 rounded-lg flex items-center gap-2 mt-1">
-                      <LogOut className="w-3.5 h-3.5" /> Logout
+                    <button onClick={handleLogout} className="w-full text-left px-3 py-2 text-sm rounded-xl hover:bg-white/5 flex items-center gap-2 text-red-400">
+                      {ICONS.logOut} Sign out
                     </button>
                   </div>
                 )}
               </div>
             ) : (
-              <button onClick={handleDiscordLogin} disabled={isLoggingIn} className="relative inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white text-black font-semibold text-xs uppercase tracking-wider hover:bg-neutral-200 transition-all disabled:opacity-70 disabled:cursor-wait">
-                {isLoggingIn ? (
-                  <>
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    Redirecting…
-                  </>
-                ) : (
-                  <>
-                    <Bot className="w-4 h-4" />
-                    Login with Discord
-                  </>
-                )}
+              <button onClick={handleLogin} disabled={isLoggingIn} className="bg-white text-black px-4 py-1.5 rounded-xl text-sm font-medium btn-press hover:bg-white/90 transition-smooth flex items-center gap-2 disabled:opacity-50">
+                {isLoggingIn ? <span className="animate-spin inline-block">{ICONS.refresh}</span> : ICONS.bot}
+                <span className="hidden sm:inline">{isLoggingIn ? 'Redirecting…' : 'Sign in'}</span>
               </button>
             )}
+            <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden p-1.5 glass rounded-xl">
+              {mobileMenuOpen ? ICONS.x : ICONS.menu}
+            </button>
           </div>
-
-          <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden p-2 rounded-xl border border-neutral-800 bg-neutral-900/50 text-neutral-300">
-            {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
         </div>
 
         {mobileMenuOpen && (
-          <div className="md:hidden border-b border-neutral-800 bg-black/95 px-6 py-6 space-y-4 animate-in fade-in duration-200">
-            <button onClick={() => setRoute('home')} className="block w-full text-left text-lg font-medium text-neutral-300 py-2 border-b border-neutral-900">Home</button>
-            <button onClick={() => setRoute('features')} className="block w-full text-left text-lg font-medium text-neutral-300 py-2 border-b border-neutral-900">Features</button>
-            <button onClick={() => setRoute('status')} className="block w-full text-left text-lg font-medium text-neutral-300 py-2 border-b border-neutral-900">Live Telemetry</button>
-            {authLoading ? (
-              <div className="py-3 text-center text-neutral-500 text-sm">Loading…</div>
-            ) : user ? (
-              <div className="pt-2 space-y-2">
-                <div className="flex items-center gap-3 py-2">
-                  <img src={user.avatar} alt="" className="w-8 h-8 rounded-full" />
-                  <span className="text-sm font-medium text-white">{user.displayName || user.username}</span>
-                </div>
-                <button onClick={() => setRoute('dashboard')} className="w-full py-3 bg-neutral-900 text-white rounded-xl text-center text-sm font-semibold border border-neutral-800">Go to Dashboard</button>
-                <button onClick={handleLogout} className="w-full py-3 bg-red-950/40 text-red-400 rounded-xl text-center text-sm font-semibold border border-red-900/50">Logout</button>
-              </div>
-            ) : (
-              <button onClick={handleDiscordLogin} disabled={isLoggingIn} className="w-full py-3 bg-white text-black font-semibold rounded-xl text-center text-sm uppercase tracking-wider disabled:opacity-70">
-                {isLoggingIn ? 'Redirecting…' : 'Login with Discord'}
+          <div className="md:hidden max-w-6xl mx-auto mt-2 glass-strong rounded-2xl p-2 animate-in">
+            {['home', 'features', 'status'].map((r) => (
+              <button key={r} onClick={() => setRoute(r)} className={`w-full text-left px-4 py-3 rounded-xl text-sm capitalize ${route === r ? 'bg-white/10' : 'hover:bg-white/5'}`}>
+                {r}
               </button>
-            )}
+            ))}
           </div>
         )}
       </header>
 
-      <main className="relative z-10 flex-grow">
-        {route === 'home' && (
-          <HomePage
-            setRoute={setRoute}
-            handleDiscordLogin={handleDiscordLogin}
-            liveStatus={liveStatus}
-            connectionError={connectionError}
-            lastSuccessTime={lastSuccessTime}
-            isLoggingIn={isLoggingIn}
-            recentEvents={recentEvents}
-            featureFlags={featureFlags}
-            serverInfo={serverInfo}
-          />
-        )}
-        {route === 'features' && (
-          <FeaturesPage
-            recentSanctions={recentSanctions}
-            featureFlags={featureFlags}
-            serverInfo={serverInfo}
-            liveStatus={liveStatus}
-          />
-        )}
-        {route === 'status' && (
-          <StatusPage
-            liveStatus={liveStatus}
-            fetchRealStatus={fetchAllData}
-            connectionError={connectionError}
-            lastSuccessTime={lastSuccessTime}
-            serverInfo={serverInfo}
-          />
-        )}
-        {route === 'dashboard' && (
-          <DashboardPage
-            user={user}
-            liveStatus={liveStatus}
-            connectionError={connectionError}
-            lastSuccessTime={lastSuccessTime}
-            serverInfo={serverInfo}
-            featureFlags={featureFlags}
-            recentSanctions={recentSanctions}
-          />
-        )}
-        {route === '404' && <NotFoundPage setRoute={setRoute} />}
+      <main className="relative z-10 pt-24">
+        {route === 'home' && <HomePage liveStatus={liveStatus} recentEvents={recentEvents} featureFlags={featureFlags} serverInfo={serverInfo} connectionError={connectionError} lastSuccessTime={lastSuccessTime} setRoute={setRoute} handleLogin={handleLogin} isLoggingIn={isLoggingIn} />}
+        {route === 'features' && <FeaturesPage recentSanctions={recentSanctions} featureFlags={featureFlags} liveStatus={liveStatus} />}
+        {route === 'status' && <StatusPage liveStatus={liveStatus} serverInfo={serverInfo} fetchAll={fetchAll} connectionError={connectionError} lastSuccessTime={lastSuccessTime} />}
+        {route === 'dashboard' && <DashboardPage user={user} liveStatus={liveStatus} recentSanctions={recentSanctions} featureFlags={featureFlags} serverInfo={serverInfo} connectionError={connectionError} lastSuccessTime={lastSuccessTime} />}
       </main>
 
-      <footer className="relative z-10 border-t border-neutral-800/80 bg-black/90 text-neutral-400 text-xs py-12">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-8">
-          <div className="flex items-center gap-2">
-            <BotLogo className="w-6 h-6" />
-            <span className="font-mono font-bold text-white uppercase text-sm">TLC-Bot</span>
-          </div>
-          <p className="text-neutral-500">© 2026 TLC-Bot. All rights reserved.</p>
-        </div>
+      <footer className="relative z-10 max-w-6xl mx-auto px-4 py-12 mt-24 text-center text-xs text-white/30">
+        <p>© 2026 TLC-Bot — Crafted with care</p>
       </footer>
     </div>
   );
 }
 
-function StaleDataBanner({ connectionError, lastSuccessTime, isRealData }) {
-  const showError = connectionError;
-  const showStale = !connectionError && isRealData === false;
-  const showOld = !connectionError && isRealData && lastSuccessTime &&
-                  (Date.now() - lastSuccessTime.getTime() > 60000);
+// --- HOME PAGE ---
+function HomePage({ liveStatus, recentEvents, featureFlags, serverInfo, setRoute, handleLogin, isLoggingIn }) {
+  const ping = liveStatus?.bot?.latency_ms ?? 38;
+  const isOp = (liveStatus?.status || 'operational') === 'operational';
+  const sanctions = liveStatus?.metrics?.activeSanctions ?? 0;
+  const animPing = useNumberTicker(ping);
+  const animSanctions = useNumberTicker(sanctions);
+  const animMembers = useNumberTicker(liveStatus?.metrics?.membersCount ?? 0);
+  const animCommands = useNumberTicker(liveStatus?.metrics?.commandsCount ?? 0);
 
-  if (!showError && !showStale && !showOld) return null;
+  const enabled = ['anti_spam', 'anti_raid', 'verification', 'monitoring'].filter(f => featureFlags?.[f]).length;
+  const total = 4;
+  const level = enabled === total ? 'Maximum' : enabled >= 2 ? 'High' : enabled >= 1 ? 'Partial' : 'Minimal';
 
-  let message = '';
-  let detail = '';
-
-  if (showError) {
-    message = 'Connection issue — showing last known data';
-    detail = connectionError;
-  } else if (showStale) {
-    message = 'Demo data — backend not reachable';
-    detail = 'Set TLC_BOT_API_URL and TLC_BOT_API_KEY in Vercel env to see live data.';
-  } else if (showOld) {
-    message = 'Data may be stale';
-    detail = `Last successful update: ${timeAgo(lastSuccessTime)}`;
-  }
+  const events = (recentEvents?.events || []).slice(0, 4);
 
   return (
-    <div className="mb-4 p-3 rounded-xl bg-amber-950/30 border border-amber-900/50 text-amber-200 text-xs flex items-start gap-2">
-      <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-      <div>
-        <p className="font-semibold">{message}</p>
-        {detail && <p className="text-amber-300/70 mt-0.5">{detail}</p>}
-      </div>
-    </div>
-  );
-}
-
-function HomePage({ setRoute, handleDiscordLogin, liveStatus, connectionError, lastSuccessTime, isLoggingIn, recentEvents, featureFlags, serverInfo }) {
-  const currentPing = liveStatus?.bot?.latency_ms ?? 38;
-  const isOperational = (liveStatus?.status || 'operational') === 'operational';
-  const activeSanctions = liveStatus?.metrics?.activeSanctions ?? 0;
-
-  const protectionFeatures = ['anti_spam', 'anti_raid', 'verification', 'monitoring'];
-  const enabledCount = protectionFeatures.filter(f => featureFlags?.[f]).length;
-  const totalFeatures = protectionFeatures.length;
-  const protectionLevel = enabledCount === totalFeatures ? 'MAXIMUM' :
-                         enabledCount >= 2 ? 'HIGH' :
-                         enabledCount >= 1 ? 'PARTIAL' : 'MINIMAL';
-
-  const events = recentEvents?.events || [];
-  const recentEventsDisplay = events.length > 0 ? events.slice(0, 3) : null;
-
-  return (
-    <div className="space-y-24 pb-20 pt-16 px-4 max-w-7xl mx-auto text-center">
-      <StaleDataBanner
-        connectionError={connectionError}
-        lastSuccessTime={lastSuccessTime}
-        isRealData={liveStatus?.isRealData}
-      />
-
-      <div className="space-y-6 max-w-4xl mx-auto">
-        <div className="flex items-center justify-center gap-4 flex-wrap">
-          <BotLogo className="w-16 h-16 sm:w-24 sm:h-24" />
-          <h1 className="text-6xl sm:text-8xl font-black uppercase text-white font-mono tracking-tight">
-            TLC-BOT
-          </h1>
+    <div className="max-w-6xl mx-auto px-4 pb-12">
+      {/* Hero */}
+      <section className="text-center pt-12 pb-20 animate-in">
+        <div className="inline-flex items-center gap-2 glass rounded-full px-3 py-1.5 text-xs mb-8">
+          <StatusDot online={isOp} />
+          <span className="text-white/70">{isOp ? 'All systems operational' : 'Degraded'}</span>
         </div>
-        <h2 className="text-2xl text-neutral-300 font-light">Professional moderation & security for your Discord server.</h2>
-        <p className="text-neutral-400 max-w-2xl mx-auto text-sm sm:text-base">
-          {serverInfo?.isRealData && serverInfo?.primary_guild
-            ? `Protecting ${serverInfo.primary_guild.name} with ${serverInfo.total_members} members.`
-            : 'Built specifically for TLC. Keeping your community secure, organized, and under control.'}
+
+        <h1 className="text-6xl sm:text-8xl md:text-9xl font-bold tracking-tighter leading-[0.95] mb-6">
+          TLC<span className="text-white/30">-</span>Bot
+        </h1>
+        <p className="text-xl sm:text-2xl text-white/50 font-light max-w-2xl mx-auto leading-relaxed">
+          Infrastructure for moderation,<br />sanctions, and security.
         </p>
-      </div>
 
-      <div className="flex justify-center gap-4 flex-wrap">
-        <button onClick={handleDiscordLogin} disabled={isLoggingIn} className="px-8 py-4 rounded-full bg-white text-black font-bold text-xs uppercase tracking-widest hover:bg-neutral-200 transition-all disabled:opacity-70">
-          {isLoggingIn ? 'Redirecting…' : 'Login with Discord'}
-        </button>
-        <button onClick={() => setRoute('status')} className="px-8 py-4 rounded-full bg-neutral-900 text-white border border-neutral-800 text-xs uppercase tracking-widest">Live Telemetry</button>
-      </div>
+        <div className="flex items-center justify-center gap-3 mt-10 flex-wrap">
+          <button onClick={handleLogin} disabled={isLoggingIn} className="bg-white text-black px-6 py-3 rounded-2xl font-medium btn-press hover:scale-[1.02] transition-smooth disabled:opacity-50 flex items-center gap-2">
+            {isLoggingIn ? <span className="animate-spin inline-block">{ICONS.refresh}</span> : ICONS.bot}
+            {isLoggingIn ? 'Redirecting…' : 'Sign in with Discord'}
+          </button>
+          <button onClick={() => setRoute('status')} className="glass px-6 py-3 rounded-2xl font-medium btn-press hover:bg-white/5 transition-smooth flex items-center gap-2">
+            Live Telemetry {ICONS.chevronRight}
+          </button>
+        </div>
+      </section>
 
-      <div
-        onClick={() => setRoute('status')}
-        className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-neutral-950 border border-neutral-800 text-xs text-neutral-400 cursor-pointer hover:border-neutral-600 transition-all"
-      >
-        <span className={`w-2 h-2 rounded-full ${isOperational ? 'bg-emerald-500' : 'bg-amber-500'} animate-ping`} />
-        <span className="text-white font-mono">
-          ● {isOperational ? 'All Systems Operational' : 'System Degraded'} ({currentPing}ms)
-        </span>
-        <ChevronRight className="w-3.5 h-3.5 text-neutral-500" />
-      </div>
-
-      <div className="pt-12 max-w-5xl mx-auto">
-        <div className="rounded-2xl bg-neutral-950 border border-neutral-800 p-4 sm:p-6 shadow-2xl relative overflow-hidden group">
-          <div className="flex items-center justify-between border-b border-neutral-800 pb-4 mb-6">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-neutral-800" />
-              <div className="w-3 h-3 rounded-full bg-neutral-800" />
-              <div className="w-3 h-3 rounded-full bg-neutral-800" />
-            </div>
-            <span className="text-xs font-mono text-neutral-500 uppercase tracking-widest">TLC-Bot Security Console</span>
-            <div className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
-              liveStatus?.isRealData
-                ? 'bg-emerald-950/40 border-emerald-900 text-emerald-400'
-                : 'bg-neutral-900 border-neutral-800 text-neutral-400'
-            }`}>
-              {liveStatus?.isRealData ? 'LIVE' : 'OFFLINE'}
-            </div>
+      {/* Bento grid */}
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-4 stagger-2 animate-in">
+        {/* Big ping */}
+        <div className="md:col-span-2 glass-card glass rounded-3xl p-8 hover-lift">
+          <div className="text-xs uppercase tracking-wider text-white/40 mb-3 font-mono">Gateway Ping</div>
+          <div className="flex items-baseline gap-3">
+            <span className="text-7xl font-bold number-ticker">{animPing}</span>
+            <span className="text-2xl text-white/40">ms</span>
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 text-left font-mono">
-            <div className="bg-neutral-900/60 border border-neutral-800 rounded-xl p-4">
-              <span className="text-xs text-neutral-500 block mb-1">PROTECTION LEVEL</span>
-              <span className="text-lg font-bold text-white">{protectionLevel}</span>
-              <span className="text-[10px] text-neutral-600 block mt-1">{enabledCount}/{totalFeatures} security features enabled</span>
-            </div>
-            <div className="bg-neutral-900/60 border border-neutral-800 rounded-xl p-4">
-              <span className="text-xs text-neutral-500 block mb-1">ACTIVE THREATS</span>
-              <span className="text-lg font-bold text-white">
-                {events.filter(e => e.severity === 'high' || e.severity === 'critical').length} DETECTED
-              </span>
-              <span className="text-[10px] text-neutral-600 block mt-1">High-severity events (24h)</span>
-            </div>
-            <div className="bg-neutral-900/60 border border-neutral-800 rounded-xl p-4">
-              <span className="text-xs text-neutral-500 block mb-1">SANCTIONS TRACKED</span>
-              <span className="text-lg font-bold text-white">{activeSanctions} ACTIVE</span>
-              <span className="text-[10px] text-neutral-600 block mt-1">SQLite database registry</span>
-            </div>
-          </div>
-
-          <div className="bg-black border border-neutral-800/80 rounded-xl p-4 font-mono text-xs text-left space-y-2 text-neutral-400">
-            <div className="flex items-center gap-2 text-neutral-500 border-b border-neutral-900 pb-1">
-              <Terminal className="w-3.5 h-3.5 text-neutral-400" />
-              <span>System Event Stream {recentEvents?.isRealData ? '• Live' : '• Offline'}</span>
-            </div>
-            {recentEventsDisplay ? recentEventsDisplay.map((event, idx) => (
-              <p key={idx} className="text-neutral-300">
-                <span className="text-neutral-600">[{formatEventTime(event.timestamp)}]</span>{' '}
-                <span className="text-white font-semibold uppercase">{event.type}:</span>{' '}
-                {event.message}
-              </p>
-            )) : (
-              <p className="text-neutral-500 italic">No recent events — backend offline or no activity yet.</p>
-            )}
+          <div className="mt-4 text-sm text-white/50">
+            {serverInfo?.isRealData && serverInfo?.primary_guild
+              ? `Connected to ${serverInfo.primary_guild.name}`
+              : 'Demo data — backend not connected'}
           </div>
         </div>
-      </div>
+
+        {/* Sanctions */}
+        <div className="glass-card glass rounded-3xl p-8 hover-lift">
+          <div className="text-xs uppercase tracking-wider text-white/40 mb-3 font-mono">Sanctions</div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-6xl font-bold number-ticker">{animSanctions}</span>
+            <span className="text-lg text-white/40">active</span>
+          </div>
+        </div>
+
+        {/* Members */}
+        <div className="glass-card glass rounded-3xl p-8 hover-lift">
+          <div className="text-xs uppercase tracking-wider text-white/40 mb-3 font-mono">Members</div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-5xl font-bold number-ticker">{animMembers.toLocaleString()}</span>
+          </div>
+        </div>
+
+        {/* Commands */}
+        <div className="glass-card glass rounded-3xl p-8 hover-lift">
+          <div className="text-xs uppercase tracking-wider text-white/40 mb-3 font-mono">Commands</div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-5xl font-bold number-ticker">{animCommands}</span>
+          </div>
+        </div>
+
+        {/* Protection */}
+        <div className="glass-card glass rounded-3xl p-8 hover-lift">
+          <div className="text-xs uppercase tracking-wider text-white/40 mb-3 font-mono">Protection</div>
+          <div className="text-2xl font-semibold mb-3">{level}</div>
+          <div className="progress-bar">
+            <div className="progress-bar-fill" style={{ width: `${(enabled / total) * 100}%` }} />
+          </div>
+          <div className="text-xs text-white/40 mt-2">{enabled}/{total} features enabled</div>
+        </div>
+      </section>
+
+      {/* Activity */}
+      <section className="mt-4 glass-card glass rounded-3xl p-6 stagger-3 animate-in">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-medium flex items-center gap-2">{ICONS.terminal} Activity</h3>
+          <span className="text-xs text-white/40 font-mono">{recentEvents?.isRealData ? 'LIVE' : 'OFFLINE'}</span>
+        </div>
+        <div className="space-y-1.5 font-mono text-xs">
+          {events.length > 0 ? events.map((e, i) => (
+            <div key={i} className="flex items-baseline gap-3 py-1.5 border-b border-white/5 last:border-0">
+              <span className="text-white/30 text-[10px] tabular-nums">{(e.timestamp || '').slice(11, 16) || '—'}</span>
+              <span className="text-white/90 font-medium uppercase tracking-wide">{e.type}</span>
+              <span className="text-white/50 truncate flex-1">{e.message}</span>
+            </div>
+          )) : (
+            <div className="text-white/40 py-2">No recent activity.</div>
+          )}
+        </div>
+      </section>
     </div>
   );
 }
 
-function FeaturesPage({ recentSanctions, featureFlags, serverInfo, liveStatus }) {
-  const [activeTab, setActiveTab] = useState('moderation');
-
-  const sanctions = recentSanctions?.sanctions || [];
+// --- FEATURES PAGE ---
+function FeaturesPage({ recentSanctions, featureFlags, liveStatus }) {
+  const [tab, setTab] = useState('moderation');
   const cmdCount = liveStatus?.metrics?.commandsCount || 0;
+  const sanctions = recentSanctions?.sanctions || [];
 
-  const featureTabs = [
-    { id: 'moderation', label: 'Moderation', icon: Shield },
-    { id: 'sanctions', label: 'Sanctions', icon: Lock },
-    { id: 'tickets', label: 'Tickets', icon: Ticket },
-    { id: 'antispam', label: 'Anti-Spam', icon: Zap },
-    { id: 'antiraid', label: 'Anti-Raid', icon: AlertTriangle },
-    { id: 'welcoming', label: 'Welcoming', icon: UserCheck }
+  const tabs = [
+    { id: 'moderation', label: 'Moderation', icon: ICONS.shield },
+    { id: 'sanctions', label: 'Sanctions', icon: ICONS.lock },
+    { id: 'tickets', label: 'Tickets', icon: ICONS.ticket },
+    { id: 'antispam', label: 'Anti-Spam', icon: ICONS.zap },
+    { id: 'antiraid', label: 'Anti-Raid', icon: ICONS.alert },
+    { id: 'welcoming', label: 'Welcoming', icon: ICONS.userCheck },
   ];
 
   return (
-    <div className="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-16">
-      <div className="text-center space-y-4 max-w-3xl mx-auto">
-        <span className="text-xs font-mono text-neutral-500 uppercase tracking-widest">SYSTEM CAPABILITIES</span>
-        <h1 className="text-4xl sm:text-6xl font-black text-white uppercase tracking-tight font-mono">Built for Control.</h1>
-        <p className="text-neutral-400 text-base">
-          {serverInfo?.isRealData
-            ? `${cmdCount} commands indexed • ${recentSanctions.active_count} active sanctions tracked`
-            : 'Everything TLC needs to keep its Discord community secure, organized, and manageable.'}
+    <div className="max-w-5xl mx-auto px-4 pb-12">
+      <div className="text-center pt-12 pb-12 animate-in">
+        <div className="text-xs uppercase tracking-wider text-white/40 font-mono mb-4">Capabilities</div>
+        <h1 className="text-5xl sm:text-7xl font-bold tracking-tighter mb-4">Built for control.</h1>
+        <p className="text-white/50 max-w-xl mx-auto">
+          {cmdCount > 0 && `${cmdCount} commands indexed • `}{recentSanctions.active_count} active sanctions tracked
         </p>
       </div>
 
-      <div className="flex items-center justify-center flex-wrap gap-2 border-b border-neutral-800 pb-6">
-        {featureTabs.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-mono uppercase tracking-wider transition-all ${
-                isActive ? 'bg-white text-black font-bold' : 'bg-neutral-900 text-neutral-400 hover:text-white border border-neutral-800'
-              }`}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              {tab.label}
-            </button>
-          );
-        })}
+      <div className="flex items-center justify-center flex-wrap gap-2 mb-8 animate-in stagger-1">
+        {tabs.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)} className={`px-4 py-2 rounded-xl text-sm flex items-center gap-2 transition-smooth ${tab === t.id ? 'bg-white text-black font-medium' : 'glass hover:bg-white/5'}`}>
+            {t.icon} {t.label}
+          </button>
+        ))}
       </div>
 
-      <div className="max-w-4xl mx-auto rounded-2xl bg-neutral-950 border border-neutral-800 p-6 sm:p-8 space-y-6 font-mono">
-        {activeTab === 'moderation' && (
-          <div className="space-y-6 text-left">
-            <h3 className="text-xl font-bold text-white uppercase">Moderation Commands</h3>
-            <p className="text-xs text-neutral-400 font-sans">
-              {cmdCount > 0
-                ? `${cmdCount} hybrid commands indexed across modular cogs. Examples:`
-                : 'High-level commands including Ban, Kick, Mute (Timeout), Warn, Purge, and Slowmode.'}
-            </p>
-            <div className="bg-black border border-neutral-800 rounded-xl p-4 text-xs text-neutral-300 space-y-1">
-              <p>/mute @user 60 Policy violation</p>
-              <p>/warn @user Spamming in #general</p>
-              <p>/kick @user Repeated rule violations</p>
-              <p>/ban @user Severe TOS breach</p>
+      <div className="glass-card glass rounded-3xl p-8 animate-in stagger-2" key={tab}>
+        {tab === 'moderation' && (
+          <div>
+            <h3 className="text-2xl font-semibold mb-3">Moderation</h3>
+            <p className="text-white/50 mb-6">High-level commands for ban, kick, mute, warn, purge, slowmode.</p>
+            <div className="glass rounded-2xl p-4 font-mono text-sm space-y-1.5">
+              <div className="text-white/70">/mute @user 60 Policy violation</div>
+              <div className="text-white/70">/warn @user Spamming in #general</div>
+              <div className="text-white/70">/kick @user Repeated rule violations</div>
+              <div className="text-white/70">/ban @user Severe TOS breach</div>
             </div>
           </div>
         )}
 
-        {activeTab === 'sanctions' && (
-          <div className="space-y-6 text-left">
-            <div className="flex justify-between items-baseline">
-              <h3 className="text-xl font-bold text-white uppercase">League Sanction System</h3>
-              {recentSanctions?.isRealData && (
-                <span className="text-xs text-neutral-500 font-sans">{recentSanctions.active_count} active</span>
-              )}
+        {tab === 'sanctions' && (
+          <div>
+            <div className="flex items-baseline justify-between mb-3">
+              <h3 className="text-2xl font-semibold">Sanctions</h3>
+              {recentSanctions?.isRealData && <span className="text-sm text-white/40 font-mono">{recentSanctions.active_count} active</span>}
             </div>
-            <p className="text-xs text-neutral-400 font-sans">Database-backed case tracking with custom Roblox & Discord identifiers, bail amounts, and lift logs.</p>
-            <div className="bg-black border border-neutral-800 rounded-xl p-4 text-xs space-y-2 text-neutral-300">
-              {sanctions.length > 0 ? sanctions.map((s) => (
-                <div key={s.case_id} className="flex justify-between items-center border-b border-neutral-900 pb-2 last:border-0 last:pb-0">
+            <p className="text-white/50 mb-6">Database-backed case tracking with Roblox & Discord identifiers, bail amounts, lift logs.</p>
+            <div className="glass rounded-2xl p-4 divide-y divide-white/5">
+              {sanctions.length > 0 ? sanctions.map(s => (
+                <div key={s.case_id} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
                   <div>
-                    <p className="font-bold text-white">CASE #{s.case_id} — {s.roblox_username}</p>
-                    <p className="text-neutral-500">{s.reason}</p>
+                    <div className="font-mono text-sm">#{s.case_id} — {s.roblox_username}</div>
+                    <div className="text-xs text-white/50 mt-0.5">{s.reason}</div>
                   </div>
                   <div className="text-right">
-                    <p className={`text-[10px] font-bold uppercase ${
-                      s.status === 'active' ? 'text-red-400' :
-                      s.status === 'lifted' ? 'text-emerald-400' : 'text-neutral-500'
-                    }`}>{s.status}</p>
-                    {s.bail_amount > 0 && <p className="text-[10px] text-neutral-500">{s.bail_amount} R$</p>}
+                    <span className={`text-[10px] uppercase tracking-wider font-mono px-2 py-0.5 rounded-full ${s.status === 'active' ? 'bg-red-500/20 text-red-300' : s.status === 'lifted' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/10 text-white/50'}`}>{s.status}</span>
+                    {s.bail_amount > 0 && <div className="text-[10px] text-white/40 mt-1 font-mono">{s.bail_amount} R$</div>}
                   </div>
                 </div>
-              )) : (
-                <p className="text-neutral-500 italic">No recent sanctions {recentSanctions?.isRealData ? '' : '— backend offline'}</p>
-              )}
+              )) : <div className="py-2 text-sm text-white/40">No recent sanctions.</div>}
             </div>
           </div>
         )}
 
-        {activeTab === 'tickets' && (
-          <div className="space-y-6 text-left">
-            <h3 className="text-xl font-bold text-white uppercase">Support Tickets</h3>
-            <p className="text-xs text-neutral-400 font-sans">Dynamic dropdown categories, staff claim buttons, and auto-generated TXT chat transcripts upon closure.</p>
-            <div className={`text-xs px-3 py-2 rounded-lg border ${
-              featureFlags?.tickets
-                ? 'bg-emerald-950/30 border-emerald-900 text-emerald-300'
-                : 'bg-neutral-900 border-neutral-800 text-neutral-500'
-            }`}>
-              {featureFlags?.isRealData
-                ? `Status: ${featureFlags.tickets ? 'Enabled' : 'Disabled'}`
-                : 'Status: Unknown (backend offline)'}
-            </div>
+        {tab === 'tickets' && (
+          <div>
+            <h3 className="text-2xl font-semibold mb-3">Tickets</h3>
+            <p className="text-white/50 mb-6">Dropdown categories, staff claim buttons, auto-transcripts on close.</p>
+            <Pill on={featureFlags?.tickets} label="Ticket system" />
           </div>
         )}
 
-        {activeTab === 'antispam' && (
-          <div className="space-y-6 text-left">
-            <h3 className="text-xl font-bold text-white uppercase">Anti-Spam Engine</h3>
-            <p className="text-xs text-neutral-400 font-sans">Monitors chat velocity per user. Triggers automatic timeouts and purges rapid spam outbursts.</p>
-            <div className={`text-xs px-3 py-2 rounded-lg border ${
-              featureFlags?.anti_spam
-                ? 'bg-emerald-950/30 border-emerald-900 text-emerald-300'
-                : 'bg-red-950/30 border-red-900 text-red-300'
-            }`}>
-              {featureFlags?.isRealData
-                ? `Status: ${featureFlags.anti_spam ? 'ENABLED' : 'DISABLED'}`
-                : 'Status: Unknown (backend offline)'}
-            </div>
+        {tab === 'antispam' && (
+          <div>
+            <h3 className="text-2xl font-semibold mb-3">Anti-Spam</h3>
+            <p className="text-white/50 mb-6">Monitors chat velocity, triggers automatic timeouts.</p>
+            <Pill on={featureFlags?.anti_spam} label="Anti-spam engine" />
           </div>
         )}
 
-        {activeTab === 'antiraid' && (
-          <div className="space-y-6 text-left">
-            <h3 className="text-xl font-bold text-white uppercase">Anti-Raid Lockdown</h3>
-            <p className="text-xs text-neutral-400 font-sans">Detects rapid influxes of newly created accounts and puts text channels into immediate lock state.</p>
-            <div className={`text-xs px-3 py-2 rounded-lg border ${
-              featureFlags?.anti_raid
-                ? 'bg-emerald-950/30 border-emerald-900 text-emerald-300'
-                : 'bg-red-950/30 border-red-900 text-red-300'
-            }`}>
-              {featureFlags?.isRealData
-                ? `Status: ${featureFlags.anti_raid ? 'ENABLED' : 'DISABLED'} — Threshold: ${featureFlags.anti_raid_threshold || 10} joins / window`
-                : 'Status: Unknown (backend offline)'}
-            </div>
+        {tab === 'antiraid' && (
+          <div>
+            <h3 className="text-2xl font-semibold mb-3">Anti-Raid</h3>
+            <p className="text-white/50 mb-6">Detects rapid influxes, triggers channel lockdown.</p>
+            <Pill on={featureFlags?.anti_raid} label="Anti-raid lockdown" />
           </div>
         )}
 
-        {activeTab === 'welcoming' && (
-          <div className="space-y-6 text-left">
-            <h3 className="text-xl font-bold text-white uppercase">Welcoming System</h3>
-            <p className="text-xs text-neutral-400 font-sans">Customizable welcome banners, dynamic variable replacement ({'{user}'}), and DM dispatch.</p>
-            <div className={`text-xs px-3 py-2 rounded-lg border ${
-              featureFlags?.welcome
-                ? 'bg-emerald-950/30 border-emerald-900 text-emerald-300'
-                : 'bg-neutral-900 border-neutral-800 text-neutral-500'
-            }`}>
-              {featureFlags?.isRealData
-                ? `Status: ${featureFlags.welcome ? 'ENABLED' : 'DISABLED'}`
-                : 'Status: Unknown (backend offline)'}
-            </div>
+        {tab === 'welcoming' && (
+          <div>
+            <h3 className="text-2xl font-semibold mb-3">Welcoming</h3>
+            <p className="text-white/50 mb-6">Custom banners, dynamic variables, DM dispatch.</p>
+            <Pill on={featureFlags?.welcome} label="Welcome system" />
           </div>
         )}
       </div>
@@ -820,326 +545,150 @@ function FeaturesPage({ recentSanctions, featureFlags, serverInfo, liveStatus })
   );
 }
 
-function StatusPage({ liveStatus, fetchRealStatus, connectionError, lastSuccessTime, serverInfo }) {
-  const [timeRange, setTimeRange] = useState('Live 1H');
+function Pill({ on, label }) {
+  return (
+    <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm ${on ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20' : 'bg-white/5 text-white/40 border border-white/10'}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${on ? 'bg-emerald-400' : 'bg-white/30'}`} />
+      {label}: {on ? 'Enabled' : 'Disabled'}
+    </div>
+  );
+}
 
-  const pingPoints = (Array.isArray(liveStatus?.pingHistory) && liveStatus.pingHistory.length > 0)
-    ? liveStatus.pingHistory
-    : DEFAULT_TELEMETRY.pingHistory;
+// --- STATUS PAGE ---
+function StatusPage({ liveStatus, serverInfo, fetchAll, connectionError, lastSuccessTime }) {
+  const ping = liveStatus?.bot?.latency_ms ?? 38;
+  const animPing = useNumberTicker(ping);
+  const isReal = Boolean(liveStatus?.isRealData);
+  const points = liveStatus?.pingHistory || DEFAULT_TELEMETRY.pingHistory;
+  const discordOk = liveStatus?.services?.discord === 'operational';
+  const dbOk = liveStatus?.services?.database === 'operational';
 
-  const logs = (Array.isArray(liveStatus?.operationsLog) && liveStatus.operationsLog.length > 0)
-    ? liveStatus.operationsLog
-    : DEFAULT_TELEMETRY.operationsLog;
-
-  const currentPing = liveStatus?.bot?.latency_ms ?? 38;
-  const isRealData = Boolean(liveStatus?.isRealData);
-  const guildsCount = liveStatus?.metrics?.guildsCount ?? 1;
-  const membersCount = liveStatus?.metrics?.membersCount ?? 1042;
-  const activeSanctions = liveStatus?.metrics?.activeSanctions ?? 0;
-
-  const generateSvgPath = (points) => {
-    if (!Array.isArray(points) || points.length === 0) {
-      return { path: '', areaPath: '', dots: [] };
-    }
-    const width = 800;
-    const height = 180;
-    const pings = points.map(p => typeof p?.ping === 'number' ? p.ping : 40);
-    const minPing = Math.max(10, Math.min(...pings) - 5);
-    const maxPing = Math.max(minPing + 10, Math.max(...pings) + 5);
-    const len = points.length;
-    const mapped = points.map((p, idx) => {
-      const x = len > 1 ? (idx / (len - 1)) * width : width / 2;
-      const rawVal = typeof p?.ping === 'number' ? p.ping : 40;
-      const y = height - ((rawVal - minPing) / (maxPing - minPing)) * (height - 30) - 15;
-      return { x, y: isNaN(y) ? height / 2 : y, ping: rawVal, label: p?.time || 'Now' };
-    });
-    if (mapped.length === 1) {
-      return {
-        path: `M 0 ${mapped[0].y} L 800 ${mapped[0].y}`,
-        areaPath: `M 0 ${mapped[0].y} L 800 ${mapped[0].y} L 800 ${height} L 0 ${height} Z`,
-        dots: mapped
-      };
-    }
-    let d = `M ${mapped[0].x} ${mapped[0].y}`;
-    for (let i = 0; i < mapped.length - 1; i++) {
-      const curr = mapped[i];
-      const next = mapped[i + 1];
-      const cx = (curr.x + next.x) / 2;
-      d += ` C ${cx} ${curr.y}, ${cx} ${next.y}, ${next.x} ${next.y}`;
-    }
-    const areaPath = `${d} L ${width} ${height} L 0 ${height} Z`;
-    return { path: d, areaPath, dots: mapped };
-  };
-
-  const chartData = generateSvgPath(pingPoints);
-  const guildName = serverInfo?.primary_guild?.name;
+  // SVG chart
+  const W = 800, H = 200;
+  const pings = points.map(p => p.ping || 40);
+  const min = Math.max(10, Math.min(...pings) - 5);
+  const max = Math.max(min + 10, Math.max(...pings) + 5);
+  const mapped = points.map((p, i) => ({
+    x: points.length > 1 ? (i / (points.length - 1)) * W : W / 2,
+    y: H - ((p.ping - min) / (max - min)) * (H - 40) - 20,
+  }));
+  let path = `M ${mapped[0].x} ${mapped[0].y}`;
+  for (let i = 0; i < mapped.length - 1; i++) {
+    const cx = (mapped[i].x + mapped[i + 1].x) / 2;
+    path += ` C ${cx} ${mapped[i].y}, ${cx} ${mapped[i + 1].y}, ${mapped[i + 1].x} ${mapped[i + 1].y}`;
+  }
+  const area = `${path} L ${W} ${H} L 0 ${H} Z`;
 
   return (
-    <div className="py-12 px-4 max-w-6xl mx-auto space-y-8 font-mono text-left">
-      <StaleDataBanner
-        connectionError={connectionError}
-        lastSuccessTime={lastSuccessTime}
-        isRealData={liveStatus?.isRealData}
-      />
+    <div className="max-w-5xl mx-auto px-4 pb-12">
+      {/* Hero */}
+      <section className="text-center pt-8 pb-12 animate-in">
+        <div className={`inline-flex items-center gap-2 glass rounded-full px-3 py-1.5 text-xs mb-6`}>
+          <StatusDot online={isReal && discordOk} error={connectionError} />
+          <span className="text-white/70">{connectionError ? 'Connection issue' : isReal ? 'Connected' : 'Demo data'}</span>
+        </div>
+        <div className="flex items-baseline justify-center gap-3">
+          <span className="text-8xl sm:text-9xl font-bold number-ticker tracking-tighter">{animPing}</span>
+          <span className="text-2xl text-white/40 font-light">ms</span>
+        </div>
+        <p className="text-white/40 text-sm mt-3">
+          {lastSuccessTime && isReal ? `Updated ${timeAgo(lastSuccessTime)}` : 'Awaiting data'}
+        </p>
+      </section>
 
-      <div className="p-6 rounded-2xl bg-neutral-950 border border-neutral-800 text-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="flex items-center gap-3">
-          <div className={`w-3 h-3 rounded-full animate-pulse ${isRealData ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-          <div>
-            <h1 className="text-xl font-bold uppercase tracking-tight">Live Operations Monitor</h1>
-            <p className="text-xs text-neutral-400 mt-0.5">
-              {isRealData
-                ? `Connected to ${guildName ? guildName + ' • ' : ''}TLC-Bot API (${currentPing}ms) — updated ${timeAgo(lastSuccessTime)}`
-                : 'Demo data — backend not connected'}
-            </p>
-          </div>
-        </div>
-        <button
-          onClick={fetchRealStatus}
-          className="px-4 py-2 bg-neutral-900 text-white font-bold text-xs border border-neutral-700 rounded-xl hover:bg-neutral-800 flex items-center gap-2 transition-all"
-        >
-          <RefreshCw className="w-3.5 h-3.5" /> Refresh Telemetry
-        </button>
-      </div>
+      {/* Services */}
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 stagger-1 animate-in">
+        <ServiceCard icon={ICONS.activity} label="Discord Gateway" ok={discordOk} />
+        <ServiceCard icon={ICONS.database} label="SQLite Database" ok={dbOk} />
+        <ServiceCard icon={ICONS.bot} label="Bot Process" ok={isReal} />
+      </section>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="p-5 rounded-2xl bg-neutral-950 border border-neutral-800 text-white space-y-2">
-          <div className="flex justify-between items-center text-xs font-bold text-neutral-400 uppercase">
-            <span>GATEWAY PING</span>
-            <Zap className="w-4 h-4 text-amber-400" />
-          </div>
-          <p className="text-3xl font-extrabold">{currentPing} ms</p>
-          <p className="text-[10px] text-neutral-500 font-sans">WebSocket telemetry delay</p>
+      {/* Chart */}
+      <section className="glass-card glass rounded-3xl p-6 stagger-2 animate-in">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-medium flex items-center gap-2">{ICONS.activity} Latency — 1 hour</h3>
+          <button onClick={fetchAll} className="text-xs glass px-3 py-1.5 rounded-lg btn-press flex items-center gap-1.5">
+            {ICONS.refresh} Refresh
+          </button>
         </div>
-        <div className="p-5 rounded-2xl bg-neutral-950 border border-neutral-800 text-white space-y-2">
-          <div className="flex justify-between items-center text-xs font-bold text-neutral-400 uppercase">
-            <span>ACTIVE GUILDS</span>
-            <Server className="w-4 h-4 text-white" />
-          </div>
-          <p className="text-3xl font-extrabold">{guildsCount}</p>
-          <p className="text-[10px] text-neutral-500 font-sans">{guildName || 'TLC Guild Master Node'}</p>
-        </div>
-        <div className="p-5 rounded-2xl bg-neutral-950 border border-neutral-800 text-white space-y-2">
-          <div className="flex justify-between items-center text-xs font-bold text-neutral-400 uppercase">
-            <span>REGISTERED ACCOUNTS</span>
-            <Users className="w-4 h-4 text-white" />
-          </div>
-          <p className="text-3xl font-extrabold">{membersCount}</p>
-          <p className="text-[10px] text-neutral-500 font-sans">Protected server members</p>
-        </div>
-        <div className="p-5 rounded-2xl bg-neutral-950 border border-neutral-800 text-white space-y-2">
-          <div className="flex justify-between items-center text-xs font-bold text-neutral-400 uppercase">
-            <span>SANCTIONS TRACKED</span>
-            <Database className="w-4 h-4 text-white" />
-          </div>
-          <p className="text-3xl font-extrabold">{activeSanctions}</p>
-          <p className="text-[10px] text-neutral-500 font-sans">SQLite database registry</p>
-        </div>
-      </div>
-
-      <div className="p-6 rounded-2xl bg-neutral-950 border border-neutral-800 text-white space-y-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h2 className="text-lg font-extrabold uppercase flex items-center gap-2">
-              <Activity className="w-5 h-5 text-amber-400" /> Gateway Ping Timeline (1H)
-            </h2>
-            <p className="text-xs text-neutral-400">Pencil-line telemetry tracking WebSocket response delay.</p>
-          </div>
-          <div className="flex items-center gap-1.5 bg-black p-1.5 rounded-xl border border-neutral-800 text-xs">
-            {['Live 1H', '24 Hours', '7 Days', '30 Days'].map((range) => (
-              <button
-                key={range}
-                onClick={() => setTimeRange(range)}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-                  timeRange === range ? 'bg-white text-black font-bold' : 'text-neutral-400 hover:text-white'
-                }`}
-              >
-                {range}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="relative w-full overflow-x-auto pt-4">
-          <svg viewBox="0 0 800 200" className="w-full h-48 overflow-visible">
-            <line x1="0" y1="40" x2="800" y2="40" stroke="#262626" strokeDasharray="4 4" />
-            <line x1="0" y1="90" x2="800" y2="90" stroke="#262626" strokeDasharray="4 4" />
-            <line x1="0" y1="140" x2="800" y2="140" stroke="#262626" strokeDasharray="4 4" />
-            {chartData.areaPath && <path d={chartData.areaPath} fill="rgba(255, 255, 255, 0.05)" />}
-            {chartData.path && <path d={chartData.path} fill="none" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" />}
-            {chartData.dots.map((dot, idx) => (
-              <g key={idx} className="group cursor-pointer">
-                <circle cx={dot.x} cy={dot.y} r="4" fill="#ffffff" stroke="#000000" strokeWidth="2" />
-                <text x={dot.x} y={dot.y - 10} textAnchor="middle" fill="#a3a3a3" fontSize="10" className="font-mono">
-                  {dot.ping}ms
-                </text>
-              </g>
+        <div className="relative w-full overflow-hidden">
+          <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-48" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stopColor="#ffffff" stopOpacity="0.3" />
+                <stop offset="100%" stopColor="#ffffff" stopOpacity="1" />
+              </linearGradient>
+            </defs>
+            <path d={area} fill="url(#lineGrad)" opacity="0.1" />
+            <path d={path} fill="none" stroke="url(#lineGrad)" strokeWidth="2" strokeLinecap="round" />
+            {mapped.map((d, i) => (
+              <circle key={i} cx={d.x} cy={d.y} r="3" fill="#ffffff" />
             ))}
           </svg>
-          <div className="hidden sm:flex justify-between text-[11px] text-neutral-500 pt-2 border-t border-neutral-900">
-            {pingPoints.map((p, idx) => (
-              <span key={idx} className="truncate max-w-[60px] text-center">{p?.time || 'Now'}</span>
-            ))}
-          </div>
-          <div className="flex sm:hidden justify-between text-[11px] text-neutral-500 pt-2 border-t border-neutral-900">
-            <span>12m ago</span>
-            <span>Now</span>
-          </div>
         </div>
+      </section>
+    </div>
+  );
+}
+
+function ServiceCard({ icon, label, ok }) {
+  return (
+    <div className="glass-card glass rounded-2xl p-5 hover-lift">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-white/40">{icon}</span>
+        <StatusDot online={ok} error={!ok} />
       </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="p-6 rounded-2xl bg-neutral-950 border border-neutral-800 text-white space-y-4">
-          <h3 className="text-sm font-bold uppercase flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Subsystem Health Grid
-          </h3>
-          <p className="text-[11px] text-neutral-400">Historical telemetry & node inspection.</p>
-          <div className="space-y-4 pt-2">
-            <div>
-              <div className="flex justify-between text-xs mb-1.5">
-                <span>Discord Gateway WS</span>
-                <span className={`font-bold ${liveStatus?.services?.discord === 'operational' ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {liveStatus?.services?.discord === 'operational' ? '100%' : 'DEGRADED'}
-                </span>
-              </div>
-              <div className="grid grid-cols-10 gap-1">
-                {Array.from({ length: 20 }).map((_, i) => (
-                  <div key={i} className={`h-3.5 rounded-xs ${
-                    liveStatus?.services?.discord === 'operational' ? 'bg-emerald-500/80' : 'bg-red-500/80'
-                  }`} />
-                ))}
-              </div>
-            </div>
-            <div>
-              <div className="flex justify-between text-xs mb-1.5">
-                <span>SQLite WAL Engine</span>
-                <span className={`font-bold ${liveStatus?.services?.database === 'operational' ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {liveStatus?.services?.database === 'operational' ? '100%' : 'DEGRADED'}
-                </span>
-              </div>
-              <div className="grid grid-cols-10 gap-1">
-                {Array.from({ length: 20 }).map((_, i) => (
-                  <div key={i} className={`h-3.5 rounded-xs ${
-                    liveStatus?.services?.database === 'operational' ? 'bg-emerald-500/80' : 'bg-red-500/80'
-                  }`} />
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="md:col-span-2 p-6 rounded-2xl bg-neutral-950 border border-neutral-800 text-white space-y-4">
-          <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
-            <h3 className="text-sm font-bold uppercase flex items-center gap-2">
-              <Terminal className="w-4 h-4 text-white" /> Operations Log Ledger
-            </h3>
-            <span className="px-2.5 py-0.5 rounded-full bg-neutral-900 text-neutral-300 font-bold text-[10px] border border-neutral-800">
-              Real-Time Audit
-            </span>
-          </div>
-          <div className="space-y-4 text-xs">
-            {logs.map((log, idx) => (
-              <div key={idx} className="border-b border-neutral-900 pb-3 space-y-1">
-                <div className="flex justify-between items-center">
-                  <span className="text-white font-bold">✓ {log.title}</span>
-                  <span className="text-neutral-500 text-[10px]">{log.time}</span>
-                </div>
-                <p className="text-neutral-400 text-[11px] leading-relaxed font-sans">{log.details}</p>
-              </div>
-            ))}
-          </div>
-        </div>
+      <div className="font-medium text-sm">{label}</div>
+      <div className={`text-xs mt-1 ${ok ? 'text-emerald-400' : 'text-red-400'}`}>
+        {ok ? 'Operational' : 'Issue'}
       </div>
     </div>
   );
 }
 
-function DashboardPage({ user, liveStatus, connectionError, lastSuccessTime, serverInfo, featureFlags, recentSanctions }) {
-  if (!user) return null;
-  return (
-    <div className="py-16 px-4 max-w-6xl mx-auto space-y-8 text-left font-mono">
-      <StaleDataBanner
-        connectionError={connectionError}
-        lastSuccessTime={lastSuccessTime}
-        isRealData={liveStatus?.isRealData}
-      />
+// --- DASHBOARD ---
+function DashboardPage({ user, liveStatus, recentSanctions, featureFlags, serverInfo, connectionError, lastSuccessTime }) {
+  if (!user) return <div className="max-w-5xl mx-auto px-4 py-24 text-center text-white/50">Sign in to access the dashboard.</div>;
 
-      <div className="flex justify-between items-center border-b border-neutral-800 pb-6">
+  return (
+    <div className="max-w-5xl mx-auto px-4 pb-12">
+      <div className="flex items-center justify-between mb-8 animate-in">
         <div>
-          <h1 className="text-3xl font-black text-white uppercase">TLC Control Dashboard</h1>
-          <p className="text-xs text-neutral-400 mt-1">Authenticated user: {user.displayName || user.username} (@{user.username})</p>
+          <h1 className="text-4xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-white/40 text-sm mt-1">@{user.username}</p>
         </div>
-        <span className={`text-xs px-3 py-1 rounded-full border ${
-          liveStatus?.isRealData
-            ? 'bg-emerald-950/40 border-emerald-900 text-emerald-400'
-            : 'bg-neutral-900 border-neutral-800 text-neutral-400'
-        }`}>
-          {liveStatus?.isRealData ? 'LIVE' : 'OFFLINE'}
-        </span>
+        <div className={`px-3 py-1.5 rounded-full text-xs glass flex items-center gap-2`}>
+          <StatusDot online={Boolean(liveStatus?.isRealData)} error={connectionError} />
+          {connectionError ? 'Offline' : liveStatus?.isRealData ? 'Live' : 'Demo'}
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="p-6 bg-neutral-950 border border-neutral-800 rounded-2xl">
-          <span className="text-xs text-neutral-500">SERVERS CONNECTED</span>
-          <p className="text-3xl font-bold text-white">{liveStatus?.metrics?.guildsCount ?? 0}</p>
-          {serverInfo?.primary_guild?.name && (
-            <p className="text-[10px] text-neutral-600 mt-1">{serverInfo.primary_guild.name}</p>
-          )}
-        </div>
-        <div className="p-6 bg-neutral-950 border border-neutral-800 rounded-2xl">
-          <span className="text-xs text-neutral-500">ACTIVE SANCTIONS</span>
-          <p className="text-3xl font-bold text-white">{recentSanctions?.active_count ?? 0}</p>
-          <p className="text-[10px] text-neutral-600 mt-1">{recentSanctions?.sanctions?.length || 0} recent cases</p>
-        </div>
-        <div className="p-6 bg-neutral-950 border border-neutral-800 rounded-2xl">
-          <span className="text-xs text-neutral-500">REGISTERED COMMANDS</span>
-          <p className="text-3xl font-bold text-white">{liveStatus?.metrics?.commandsCount ?? 0}</p>
-          <p className="text-[10px] text-neutral-600 mt-1">Across {Object.keys(featureFlags || {}).filter(k => typeof featureFlags[k] === 'boolean').length} feature modules</p>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 stagger-1 animate-in">
+        <MetricCard label="Guilds" value={liveStatus?.metrics?.guildsCount ?? 0} />
+        <MetricCard label="Sanctions" value={recentSanctions?.active_count ?? 0} sub={`${recentSanctions?.sanctions?.length || 0} recent`} />
+        <MetricCard label="Commands" value={liveStatus?.metrics?.commandsCount ?? 0} sub={`${Object.keys(featureFlags || {}).filter(k => typeof featureFlags[k] === 'boolean').length} modules`} />
       </div>
 
       {serverInfo?.isRealData && (
-        <div className="p-6 bg-neutral-950 border border-neutral-800 rounded-2xl">
-          <h2 className="text-sm font-bold uppercase mb-4 text-neutral-400">Bot Runtime Information</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
-            <div>
-              <p className="text-neutral-500 mb-1">UPTIME</p>
-              <p className="text-white font-bold flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5" /> {formatUptime(serverInfo.uptime_seconds)}
-              </p>
-            </div>
-            <div>
-              <p className="text-neutral-500 mb-1">PYTHON</p>
-              <p className="text-white font-bold flex items-center gap-1.5">
-                <Code className="w-3.5 h-3.5" /> {serverInfo.python_version}
-              </p>
-            </div>
-            <div>
-              <p className="text-neutral-500 mb-1">DISCORD.PY</p>
-              <p className="text-white font-bold flex items-center gap-1.5">
-                <Cpu className="w-3.5 h-3.5" /> {serverInfo.discord_py_version}
-              </p>
-            </div>
-            <div>
-              <p className="text-neutral-500 mb-1">PLATFORM</p>
-              <p className="text-white font-bold">{serverInfo.platform}</p>
-            </div>
+        <div className="glass-card glass rounded-3xl p-6 mb-4 stagger-2 animate-in">
+          <h3 className="text-sm font-medium mb-4">Runtime</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <InfoRow icon={ICONS.clock} label="Uptime" value={formatUptime(serverInfo.uptime_seconds)} />
+            <InfoRow icon={ICONS.code} label="Python" value={serverInfo.python_version} />
+            <InfoRow icon={ICONS.cpu} label="discord.py" value={serverInfo.discord_py_version} />
+            <InfoRow icon={ICONS.server} label="OS" value={serverInfo.platform} />
           </div>
         </div>
       )}
 
       {featureFlags?.isRealData && (
-        <div className="p-6 bg-neutral-950 border border-neutral-800 rounded-2xl">
-          <h2 className="text-sm font-bold uppercase mb-4 text-neutral-400">Active Feature Modules</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-            {Object.entries(featureFlags).filter(([k, v]) => typeof v === 'boolean').map(([key, value]) => (
-              <div key={key} className={`px-3 py-2 rounded-lg border ${
-                value
-                  ? 'bg-emerald-950/30 border-emerald-900 text-emerald-300'
-                  : 'bg-neutral-900 border-neutral-800 text-neutral-500'
-              }`}>
-                <span className="font-bold uppercase">{key.replace(/_/g, ' ')}</span>
-                <span className="ml-2 text-[10px]">{value ? 'ON' : 'OFF'}</span>
+        <div className="glass-card glass rounded-3xl p-6 stagger-3 animate-in">
+          <h3 className="text-sm font-medium mb-4">Modules</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            {Object.entries(featureFlags).filter(([k, v]) => typeof v === 'boolean').map(([k, v]) => (
+              <div key={k} className={`px-3 py-2 rounded-xl text-xs flex items-center gap-2 ${v ? 'bg-emerald-500/10 text-emerald-300' : 'bg-white/5 text-white/40'}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${v ? 'bg-emerald-400' : 'bg-white/30'}`} />
+                <span className="capitalize">{k.replace(/_/g, ' ')}</span>
               </div>
             ))}
           </div>
@@ -1149,17 +698,22 @@ function DashboardPage({ user, liveStatus, connectionError, lastSuccessTime, ser
   );
 }
 
-function NotFoundPage({ setRoute }) {
+function MetricCard({ label, value, sub }) {
+  const anim = useNumberTicker(value);
   return (
-    <div className="py-32 px-4 text-center space-y-6 font-mono">
-      <h1 className="text-8xl font-black text-white tracking-widest">404</h1>
-      <p className="text-neutral-400 text-base">This page doesn't exist.</p>
-      <button
-        onClick={() => setRoute('home')}
-        className="px-8 py-3 rounded-full bg-white text-black font-bold text-xs uppercase tracking-widest hover:bg-neutral-200 transition-all"
-      >
-        Return Home
-      </button>
+    <div className="glass-card glass rounded-3xl p-6 hover-lift">
+      <div className="text-xs uppercase tracking-wider text-white/40 mb-2 font-mono">{label}</div>
+      <div className="text-4xl font-bold number-ticker">{anim.toLocaleString()}</div>
+      {sub && <div className="text-xs text-white/40 mt-1">{sub}</div>}
+    </div>
+  );
+}
+
+function InfoRow({ icon, label, value }) {
+  return (
+    <div>
+      <div className="text-xs text-white/40 mb-1 flex items-center gap-1.5">{icon} {label}</div>
+      <div className="font-medium">{value}</div>
     </div>
   );
 }
