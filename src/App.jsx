@@ -1,6 +1,6 @@
 /**
  * TLC-Bot Website — Premium Edition v3
- * The real one. No compromises. 1500+ lines of polish.
+ * The real one. No compromises.
  */
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
@@ -412,7 +412,7 @@ function Pill({ on, label }) {
 function VerificationPage({ defaultToken, onVerified }) {
   const [token, setToken] = useState(defaultToken || '');
   const [robloxUsername, setRobloxUsername] = useState('');
-  const [status, setStatus] = useState('idle'); // 'idle' | 'submitting' | 'success' | 'error'
+  const [status, setStatus] = useState('idle');
   const [message, setMessage] = useState('');
 
   useEffect(() => {
@@ -553,11 +553,21 @@ export default function App() {
   const [verificationToken, setVerificationToken] = useState('');
   const scrollY = useScrollY();
 
-  // URL query params check on load (handles verification tokens or auth errors)
+  // Smart URL query + Path parameter check for /verify/<token>
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
+
+    const url = window.location;
+    const params = new URLSearchParams(url.search);
+    let token = params.get('token');
+
+    if (!token && url.pathname.includes('/verify/')) {
+      const pathParts = url.pathname.split('/verify/');
+      if (pathParts[1]) {
+        token = pathParts[1].split('/')[0];
+      }
+    }
+
     if (token) {
       setVerificationToken(token);
       setRoute('verify');
@@ -602,7 +612,7 @@ export default function App() {
       clearTimeout(t);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return await res.json();
-    } finally { clearTimeout(t); }
+    } fontFinally { clearTimeout(t); }
   }, []);
 
   const fetchAll = useCallback(async () => {
@@ -638,11 +648,8 @@ export default function App() {
     return () => { clearInterval(interval); document.removeEventListener('visibilitychange', vis); };
   }, [fetchAll]);
 
-  useEffect(() => { window.scrollTo(0, 0); setMobileMenuOpen(false); }, [route]);
-
   useEffect(() => { setNavScrolled(scrollY > 20); }, [scrollY]);
 
-  // Keyboard shortcuts
   useEffect(() => {
     const h = (e) => {
       if (e.ctrlKey || e.metaKey) return;
@@ -1006,12 +1013,6 @@ function StatusPage({ liveStatus, serverInfo, fetchAll, connectionError, lastSuc
   const points = liveStatus?.pingHistory || DEFAULT_TELEMETRY.pingHistory;
   const discordOk = liveStatus?.services?.discord === 'operational';
   const dbOk = liveStatus?.services?.database === 'operational';
-  const [, setNow] = useState(Date.now());
-
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
 
   const W = 800, H = 200;
   const pings = points.map(p => p.ping || 40);
