@@ -1,70 +1,69 @@
-// api/process-verification.js
+import fetch from 'node-fetch';
 
 export default async function handler(req, res) {
-  // CORS Headers
-  const origin = req.headers.origin;
-  const allowedOrigins = [
-    'https://tlc-bot-website.vercel.app',
-    'https://genesis26s-tlc-bot-website-xi.vercel.app',
-    'http://localhost:3000',
-    'http://localhost:5173'
-  ];
-
-  if (allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  }
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(204).end();
-  }
-
   if (req.method !== 'POST') {
-    return res.status(405).json({ success: false, message: 'Method Not Allowed' });
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const { token, robloxUsername, captchaToken } = req.body;
+
+  if (!token || !robloxUsername) {
+    return res.status(400).json({ error: 'Missing required parameters.' });
   }
 
   try {
-    const { token, roblox_username, browser_hash } = req.body;
-
-    if (!token || !roblox_username || !browser_hash) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Missing required verification parameters (token, roblox_username, or browser_hash).' 
+    // 1. Validate CAPTCHA (Optional if secret key set)
+    if (process.env.RECAPTCHA_SECRET_KEY && captchaToken) {
+      const captchaRes = await fetch('https://www.google.com/recaptcha/api/siteverify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `secret=${process.env.RECAPTCHA_SECRET_KEY}&response=${captchaToken}`
       });
+      const captchaData = await captchaRes.json();
+      if (!captchaData.success) {
+        return res.status(400).json({ error: 'CAPTCHA verification failed.' });
+      }
     }
 
-    // Extract true client IP (handling Vercel reverse proxy headers)
-    const forwardedFor = req.headers['x-forwarded-for'];
-    const client_ip = forwardedFor ? forwardedFor.split(',')[0].trim() : (req.socket.remoteAddress || '127.0.0.1');
+    // 2. Resolve Roblox User ID
+    const robloxRes = await fetch('https://users.roblox.com/v1/usernames/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usernames: [robloxUsername], excludeBannedUsers: true })
+    });
+    const robloxData = await robloxRes.json();
 
-    // Forward request to Bot Host internal API
-    const botHostUrl = process.env.BOT_API_URL || 'http://176.100.37.77:30088';
-    
-    const botResponse = await fetch(`${botHostUrl}/internal/process-verification`, {
+    if (!robloxData.data || robloxData.data.length === 0) {
+      return res.status(404).json({ error: 'Roblox user not found.' });
+    }
+
+    const robloxUser = robloxData.data[0];
+
+    // 3. Post verification payload to the running Bot's internal API
+    const botApiUrl = process.env.BOT_API_URL; // e.g., http://your-bot-ip:8080/api/verify-complete
+    const botResponse = await fetch(botApiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(process.env.TLC_BOT_API_KEY && {
-          'Authorization': `Bearer ${process.env.TLC_BOT_API_KEY}`
-        })
+        'Authorization': `Bearer ${process.env.INTERNAL_API_KEY}`
       },
       body: JSON.stringify({
         token,
-        roblox_username,
-        browser_hash,
-        client_ip
+        roblox_id: robloxUser.id,
+        roblox_username: robloxUser.name,
+        client_ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress
       })
     });
 
-    const data = await botResponse.json();
-    return res.status(botResponse.status).json(data);
+    const result = await botResponse.json();
+    if (!botResponse.ok) {
+      return res.status(botResponse.status).json({ error: result.error || 'Bot failed to process verification.' });
+    }
 
-  } catch (error) {
-    console.error('API Verification Proxy Error:', error);
-    return res.status(502).json({ 
-      success: false, 
-      message: 'Failed to communicate with the verification backend engine.' 
-    });
+    return res.status(200).json({ success: true, message: 'Verification successful!' });
+
+  } catch (err) {
+    console.error('Verification Error:', err);
+    return res.status(500).json({ error: 'Internal server error during verification.' });
   }
 }
