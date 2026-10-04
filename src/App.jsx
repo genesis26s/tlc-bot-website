@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 
 // ═════════════════════════════════════════════════════════════════════════════
 // INLINE SVG ICONS
@@ -225,7 +226,7 @@ function Marquee({ items, reverse = false, speed = 35 }) {
   );
 }
 
-// ═════════════════════════════════════════════════════════════════════════════
+// ════════════��════════════════════════════════════════════════════════════════
 // BACKGROUND
 // ═════════════════════════════════════════════════════════════════════════════
 function Background() {
@@ -760,6 +761,7 @@ export default function App() {
         {route === 'verify' && <VerificationPage defaultToken={verificationToken} />}
         {route === 'dashboard' && <DashboardPage user={user} liveStatus={liveStatus} recentSanctions={recentSanctions} featureFlags={featureFlags} serverInfo={serverInfo} setRoute={setRoute} />}
       </main>
+      <Analytics />
     </div>
   );
 }
