@@ -1,109 +1,70 @@
-import fetch from 'node-fetch';
+// api/process-verification.js
 
 export default async function handler(req, res) {
   // CORS Headers
-  res.setHeader('Access-Control-Allow-Credentials', true);
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
-  );
+  const origin = req.headers.origin;
+  const allowedOrigins = [
+    'https://tlc-bot-website.vercel.app',
+    'https://genesis26s-tlc-bot-website-xi.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:5173'
+  ];
+
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
+    return res.status(204).end();
   }
 
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed. Use POST.' });
-  }
-
-  const { token, robloxUsername, captchaToken } = req.body || {};
-
-  if (!token || !robloxUsername) {
-    return res.status(400).json({ error: 'Missing required fields: token and robloxUsername are required.' });
+    return res.status(405).json({ success: false, message: 'Method Not Allowed' });
   }
 
   try {
-    // 1. Verify Google reCAPTCHA
-    const recaptchaSecret = process.env.RECAPTCHA_SECRET_KEY;
-    if (recaptchaSecret && captchaToken) {
-      const captchaRes = await fetch('https://www.google.com/recaptcha/api/siteverify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: `secret=${encodeURIComponent(recaptchaSecret)}&response=${encodeURIComponent(captchaToken)}`
+    const { token, roblox_username, browser_hash } = req.body;
+
+    if (!token || !roblox_username || !browser_hash) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Missing required verification parameters (token, roblox_username, or browser_hash).' 
       });
-      const captchaData = await captchaRes.json();
-
-      if (!captchaData.success) {
-        return res.status(400).json({ error: 'reCAPTCHA verification failed. Please complete the CAPTCHA again.' });
-      }
     }
 
-    // 2. Fetch Roblox Account Info
-    const robloxRes = await fetch('https://users.roblox.com/v1/usernames/users', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ usernames: [robloxUsername], excludeBannedUsers: false })
-    });
+    // Extract true client IP (handling Vercel reverse proxy headers)
+    const forwardedFor = req.headers['x-forwarded-for'];
+    const client_ip = forwardedFor ? forwardedFor.split(',')[0].trim() : (req.socket.remoteAddress || '127.0.0.1');
 
-    if (!robloxRes.ok) {
-      return res.status(502).json({ error: 'Unable to query Roblox API. Please try again later.' });
-    }
-
-    const robloxData = await robloxRes.json();
-    if (!robloxData.data || robloxData.data.length === 0) {
-      return res.status(404).json({ error: `Roblox user "${robloxUsername}" does not exist.` });
-    }
-
-    const robloxUser = robloxData.data[0];
-
-    // 3. Post verification payload to the Discord Bot API
-    const botApiUrl = process.env.BOT_API_URL;
-    const internalApiKey = process.env.INTERNAL_API_KEY;
-
-    if (!botApiUrl || !internalApiKey) {
-      return res.status(500).json({ error: 'Server configuration error: BOT_API_URL or INTERNAL_API_KEY is not configured.' });
-    }
-
-    const clientIp = req.headers['x-forwarded-for']
-      ? req.headers['x-forwarded-for'].split(',')[0].trim()
-      : req.socket.remoteAddress;
-
-    const botRes = await fetch(`${botApiUrl.replace(/\/$/, '')}/api/verify-complete`, {
+    // Forward request to Bot Host internal API
+    const botHostUrl = process.env.BOT_API_URL || 'http://176.100.37.77:30088';
+    
+    const botResponse = await fetch(`${botHostUrl}/internal/process-verification`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${internalApiKey}`
+        ...(process.env.TLC_BOT_API_KEY && {
+          'Authorization': `Bearer ${process.env.TLC_BOT_API_KEY}`
+        })
       },
       body: JSON.stringify({
-        token: token,
-        roblox_id: robloxUser.id,
-        roblox_username: robloxUser.name,
-        client_ip: clientIp
+        token,
+        roblox_username,
+        browser_hash,
+        client_ip
       })
     });
 
-    const botResult = await botRes.json();
-
-    if (!botRes.ok) {
-      return res.status(botRes.status).json({
-        error: botResult.error || 'The bot rejected the verification request.'
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: 'Verification processed successfully.',
-      user: {
-        robloxId: robloxUser.id,
-        robloxUsername: robloxUser.name
-      }
-    });
+    const data = await botResponse.json();
+    return res.status(botResponse.status).json(data);
 
   } catch (error) {
-    console.error('Process Verification Error:', error);
-    return res.status(500).json({ error: 'An internal server error occurred while processing verification.' });
+    console.error('API Verification Proxy Error:', error);
+    return res.status(502).json({ 
+      success: false, 
+      message: 'Failed to communicate with the verification backend engine.' 
+    });
   }
 }
